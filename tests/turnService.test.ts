@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { processTurn } from '../server/turn/service';
 import { MockModelAdapter } from '../server/adapters/MockModelAdapter';
 import { TurnRequest } from '../src/game/types';
+import { ModelAdapter } from '../server/adapters/ModelAdapter';
 
 const baseRequest: TurnRequest = {
   scenarioId: 'demo',
@@ -53,5 +54,27 @@ describe('processTurn', () => {
 
     // Starting from (-2, 4) with deltas (1, -1) => (-1, 3) => defensive
     expect(response.presentation.portraitState).toBe('defensive');
+  });
+
+  it('returns fallback for whitespace-only model characterText', async () => {
+    const whitespaceAdapter: ModelAdapter = {
+      async generateTurn() {
+        return {
+          characterText: '   ',
+          assessment: {
+            intent: 'acknowledge',
+            engagementDelta: 0,
+            tensionDelta: 0,
+          },
+        };
+      },
+    };
+
+    const response = await processTurn(baseRequest, whitespaceAdapter);
+
+    expect(response.characterText).toBe("I'm not sure how to respond to that.");
+    expect(response.assessment.intent).toBe('unclear');
+    expect(response.assessment.engagementDelta).toBe(0);
+    expect(response.assessment.tensionDelta).toBe(0);
   });
 });

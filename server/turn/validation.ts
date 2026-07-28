@@ -3,7 +3,12 @@ import { SCENARIO } from '../../src/game/scenario';
 
 export const TranscriptEntrySchema = z.object({
   speaker: z.enum(['player', 'character']),
-  text: z.string().min(1).max(2000),
+  text: z
+    .string()
+    .transform((s) => s.trim())
+    .refine((s) => s.length > 0 && s.length <= 2000, {
+      message: 'Transcript text must contain at least one non-whitespace character and be no more than 2000 characters',
+    }),
 });
 
 export const TurnRequestSchema = z.object({

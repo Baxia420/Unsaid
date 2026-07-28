@@ -82,4 +82,40 @@ describe('POST /api/turn', () => {
     expect(res.status).toBe(400);
     expect(res.body.error).toBe('Invalid request');
   });
+
+  it('returns 400 for malformed JSON body with stable error shape', async () => {
+    const res = await request(app)
+      .post('/api/turn')
+      .set('Content-Type', 'application/json')
+      .send('{"bad":');
+
+    expect(res.status).toBe(400);
+    expect(res.headers['content-type']).toMatch(/json/);
+    expect(res.body.error).toBe('Invalid request');
+    expect(res.body.details).toEqual([
+      {
+        path: [],
+        message: 'Malformed JSON body',
+      },
+    ]);
+    expect(res.body.stack).toBeUndefined();
+    expect(res.body.message).toBeUndefined();
+  });
+
+  it('returns 400 for whitespace-only transcript text', async () => {
+    const res = await request(app)
+      .post('/api/turn')
+      .send({
+        scenarioId: 'demo',
+        turnIndex: 0,
+        playerText: 'Hello',
+        state: { engagement: 0, tension: 0 },
+        recentTranscript: [
+          { speaker: 'player', text: '   ' },
+        ],
+      });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('Invalid request');
+  });
 });
