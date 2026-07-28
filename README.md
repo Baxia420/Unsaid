@@ -1,14 +1,153 @@
-# Unsaid — Say It Again
+# Unsaid
 
-## Setup
+A browser-based cinematic conversation game. This repository contains the first episode, **Say It Again**.
+
+## What Stage 0 Proves
+
+Stage 0 is a fully playable, end-to-end conversation slice with deterministic mock inference. It demonstrates:
+
+- A typed client/server turn loop (`POST /api/turn`) that processes player input and returns a structured character response.
+- Code-owned game state: **Engagement** and **Tension** are updated by deterministic server-side logic, not surfaced directly to the model.
+- Portrait state derived from accumulated axes as a debug-visible signal of state progression.
+- Deterministic fallback behavior when the model adapter returns malformed output or throws an inference error.
+- Automated test coverage for state machines, Zod schemas, the turn service, the API route, the mock adapter, the client store, and the HTTP client.
+- A single placeholder scenario (Cafe Apology) that supports a short 3–5 turn conversation.
+
+No live AI provider is connected; all responses come from `MockModelAdapter`.
+
+## Prerequisites
+
+- **Node.js** >= 18
+- **npm** >= 9
+
+## Installation
 
 ```bash
 npm install
 ```
 
-## Commands
+No environment variables are required for the current Stage 0 path.
 
-- `npm run type-check` — TypeScript type checking
-- `npm run test` — Run Vitest tests
-- `npm run build` — Production build
-- `npm run dev` — Start Vite dev server
+## Development
+
+```bash
+npm run dev
+```
+
+This single command starts both the **Express server** and the **Vite development server** via `concurrently`:
+
+- Express API server runs on port `3000`
+- Vite dev server runs on port `5173`
+
+Open the app at: **http://localhost:5173**
+
+All requests to `/api/*` from the browser are proxied to the Express server (`http://localhost:3000`).
+
+## Other Commands
+
+| Command | Description |
+|---------|-------------|
+| `npm run type-check` | Run TypeScript type checking (`tsc --noEmit`) |
+| `npm run test` | Run the full Vitest test suite |
+| `npm run build` | Production build (TypeScript compilation + Vite bundle to `dist/`) |
+
+## Default Runtime
+
+The default runtime uses **`MockModelAdapter`** and requires no paid API key. No `.env` file or provider secrets are needed.
+
+To connect a live server-side adapter in the future, implement `ModelAdapter` (see `server/adapters/ModelAdapter.ts`) and update `buildAdapter()` in `server/index.ts` to return the live implementation instead of `MockModelAdapter`.
+
+## Tested Fallback Behavior
+
+Automated tests confirm three deterministic fallback paths:
+
+1. **Valid adapter output** → normal state progression via `applyTurn`.
+2. **Malformed adapter output** (extra fields, wrong types, missing fields) → request rejected with `400`; no state change.
+3. **Thrown inference error** → `TurnServiceError` with deterministic fallback response:
+   - Character line: "...I don't know what to say right now."
+   - `engagementDelta: 0`, `tensionDelta: 0`
+   - `turnComplete: false`
+   - `portraitState` remains unchanged.
+
+See `tests/turnService.test.ts` for the exact assertions.
+
+## Code Ownership
+
+- **Engagement / Tension ranges** — owned by `server/turn/validation.ts` (clamped to `[-3, 3]` per turn, range `[-5, 5]` per axis).
+- **Portrait state** — derived entirely by `derivePortraitState()` in `src/game/state.ts` from the accumulated engagement/tension axes. It is temporarily visible in the UI for debugging.
+- **Turn progression** — owned by `applyTurn()` in `src/game/state.ts` on the client and validated by `TurnService` on the server.
+- **Fallback behavior** — deterministic recovery path in `server/turn/service.ts` when the adapter throws.
+
+## Project Structure
+
+```
+.
+├── docs/
+│   └── CODEBUDDY_STAGE0_CREDIT_EFFICIENT_HANDOFF.md   # Stage 0 milestone spec
+├── index.html                                         # Vite entry HTML
+├── package.json
+├── server.ts                                          # Express bootstrap (dev + prod)
+├── vite.config.ts
+├── tsconfig.json
+├── server/
+│   ├── index.ts                                       # Express app factory
+│   ├── adapters/
+│   │   ├── ModelAdapter.ts                            # Adapter interface
+│   │   └── MockModelAdapter.ts                        # Deterministic mock responses
+│   └── turn/
+│       ├── route.ts                                   # POST /api/turn handler
+│       ├── service.ts                                 # Turn orchestration + fallback
+│       ├── schema.ts                                  # Zod request/response schemas
+│       ├── validation.ts                              # Axis clamping
+│       └── prompt.ts                                  # System prompt builder
+├── src/
+│   ├── main.tsx                                       # React root mount
+│   ├── App.tsx                                        # Top-level app shell
+│   ├── vite-env.d.ts
+│   ├── components/
+│   │   ├── ConversationScene.tsx                      # Main game UI
+│   │   └── ConversationScene.css                      # Minimal placeholder styles
+│   ├── game/
+│   │   ├── types.ts                                   # Core domain types
+│   │   ├── state.ts                                   # applyTurn + derivePortraitState
+│   │   ├── store.ts                                   # Zustand client store
+│   │   └── scenario.ts                                # Placeholder scenario data
+│   └── lib/
+│       └── turnClient.ts                              # Fetch wrapper for /api/turn
+└── tests/
+    ├── mockAdapter.test.ts
+    ├── schema.test.ts
+    ├── state.test.ts
+    ├── store.test.ts
+    ├── turnClient.test.ts
+    ├── turnRoute.test.ts
+    └── turnService.test.ts
+```
+
+## Systems Completed in Stage 0
+
+- Client/server turn loop with typed request/response
+- Zod schema validation for inbound and outbound turn data
+- Deterministic mock model adapter with varied responses based on player input keywords
+- Server-side axis clamping and range validation
+- Client game state machine (`applyTurn`, `derivePortraitState`)
+- Zustand store with optimistic UI, loading states, and retry logic
+- React conversation scene with transcript, input, and submit flow
+- Express API route with centralized error handling
+- Comprehensive automated test suite (47 tests across 7 files)
+- TypeScript strict mode + production build pipeline
+
+## Known Limitations
+
+- **Mock inference only** — no live model provider is connected.
+- **One placeholder scenario** — the Cafe Apology scene is a short conversation slice, not the final story.
+- **Placeholder visuals and minimal CSS** — the current UI is functional but not final artwork.
+- **No REHEARSE/SAY mechanic yet** — this is the central design feature of the full game and will be implemented in a later stage.
+- **No final story, endings, artwork, audio, animation, deployment, database, accounts, or analytics.**
+- The client currently sends the **accumulated transcript** as `recentTranscript`; the current slice is designed and verified for a short placeholder conversation.
+- `portraitState` is temporarily visible in the interface for debugging purposes.
+- **Engagement and Tension remain hidden** from the interface; they are code-owned state axes only.
+
+## License
+
+MIT
