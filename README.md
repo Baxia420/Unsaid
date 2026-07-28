@@ -36,12 +36,12 @@ npm run dev
 
 This single command starts both the **Express server** and the **Vite development server** via `concurrently`:
 
-- Express API server runs on port `3000`
+- Express API server runs on port `3001`
 - Vite dev server runs on port `5173`
 
 Open the app at: **http://localhost:5173**
 
-All requests to `/api/*` from the browser are proxied to the Express server (`http://localhost:3000`).
+All requests to `/api/*` from the browser are proxied to the Express server (`http://localhost:3001`).
 
 ## Other Commands
 
@@ -55,28 +55,42 @@ All requests to `/api/*` from the browser are proxied to the Express server (`ht
 
 The default runtime uses **`MockModelAdapter`** and requires no paid API key. No `.env` file or provider secrets are needed.
 
-To connect a live server-side adapter in the future, implement `ModelAdapter` (see `server/adapters/ModelAdapter.ts`) and update `buildAdapter()` in `server/index.ts` to return the live implementation instead of `MockModelAdapter`.
+To connect a live server-side adapter in the future, implement `ModelAdapter` (see `server/adapters/ModelAdapter.ts`) and replace the `MockModelAdapter` instance in `server/index.ts` with the live implementation.
 
 ## Tested Fallback Behavior
 
 Automated tests confirm three deterministic fallback paths:
 
 1. **Valid adapter output** → normal state progression via `applyTurn`.
-2. **Malformed adapter output** (extra fields, wrong types, missing fields) → request rejected with `400`; no state change.
-3. **Thrown inference error** → `TurnServiceError` with deterministic fallback response:
-   - Character line: "...I don't know what to say right now."
-   - `engagementDelta: 0`, `tensionDelta: 0`
-   - `turnComplete: false`
-   - `portraitState` remains unchanged.
+2. **Malformed adapter output** (extra fields, wrong types, missing fields) → deterministic fallback response via `makeFallback` in `server/turn/service.ts`:
+   - Character line: "I'm not sure how to respond to that."
+   - `intent: 'unclear'`, `engagementDelta: 0`, `tensionDelta: 0`
+   - `portraitState` derived from the incoming request state.
+3. **Thrown inference error** → identical deterministic fallback response.
 
 See `tests/turnService.test.ts` for the exact assertions.
 
+## Mock Model Behavior
+
+`MockModelAdapter` branches on keywords in `playerText` (case-insensitive) to produce deterministic, varied responses:
+
+| Keyword(s) | Intent | engagementDelta | tensionDelta | Example response |
+|---|---|---|---|---|
+| `sorry`, `apologize`, `regret` | `repair` | `+2` | `-1` | "I appreciate you saying that. It means more than you know." |
+| `why`, `what`, `how could` | `pressure` | `-1` | `+2` | "I don't know if I can answer that right now." |
+| `understand`, `listen`, `hear` | `acknowledge` | `+1` | `-1` | "I hear you. I just don't know what to say right now." |
+| `defend`, `not my fault`, `blame` | `defend` | `-2` | `+1` | "It feels like you're closing yourself off." |
+| `space`, `time`, `away` | `redirect` | `-2` | `-2` | "Maybe some distance would be good for both of us." |
+| *(none of the above)* | `unclear` | `0` | `0` | "I'm not sure what you're getting at." |
+
+These deltas are clamped to `[-3, 3]` per turn and accumulated state is clamped to `[-10, 10]` per axis.
+
 ## Code Ownership
 
-- **Engagement / Tension ranges** — owned by `server/turn/validation.ts` (clamped to `[-3, 3]` per turn, range `[-5, 5]` per axis).
+- **Engagement / Tension ranges** — per-turn deltas are clamped to `[-3, 3]` by `applyTurn` in `src/game/state.ts` using bounds from `src/game/scenario.ts`. Accumulated axes are clamped to `[-10, 10]`.
 - **Portrait state** — derived entirely by `derivePortraitState()` in `src/game/state.ts` from the accumulated engagement/tension axes. It is temporarily visible in the UI for debugging.
-- **Turn progression** — owned by `applyTurn()` in `src/game/state.ts` on the client and validated by `TurnService` on the server.
-- **Fallback behavior** — deterministic recovery path in `server/turn/service.ts` when the adapter throws.
+- **Turn progression** — owned by `applyTurn()` in `src/game/state.ts` on the client and orchestrated by `processTurn()` in `server/turn/service.ts` on the server.
+- **Fallback behavior** — deterministic recovery path in `server/turn/service.ts` when the adapter throws or returns malformed output.
 
 ## Project Structure
 
@@ -98,7 +112,7 @@ See `tests/turnService.test.ts` for the exact assertions.
 │       ├── route.ts                                   # POST /api/turn handler
 │       ├── service.ts                                 # Turn orchestration + fallback
 │       ├── schema.ts                                  # Zod request/response schemas
-│       ├── validation.ts                              # Axis clamping
+│       ├── validation.ts                              # Request validation schema
 │       └── prompt.ts                                  # System prompt builder
 ├── src/
 │   ├── main.tsx                                       # React root mount
@@ -134,7 +148,7 @@ See `tests/turnService.test.ts` for the exact assertions.
 - Zustand store with optimistic UI, loading states, and retry logic
 - React conversation scene with transcript, input, and submit flow
 - Express API route with centralized error handling
-- Comprehensive automated test suite (47 tests across 7 files)
+- Comprehensive automated test suite covering schemas, state, store, client, route, service, and mock adapter
 - TypeScript strict mode + production build pipeline
 
 ## Known Limitations
