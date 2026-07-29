@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { useGameStore, GameStore } from '../src/game/store';
+import { useGameStore, GameStore, createInitialState } from '../src/game/store';
 import { postTurn } from '../src/lib/turnClient';
 import { TurnResponse } from '../src/game/types';
 
@@ -14,17 +14,7 @@ vi.mock('../src/lib/turnClient', () => ({
 }));
 
 function resetStore() {
-  useGameStore.setState({
-    engagement: 0,
-    tension: 0,
-    portraitState: 'connected',
-    transcript: [],
-    turnIndex: 0,
-    input: '',
-    pendingMessage: null,
-    status: 'idle',
-    error: null,
-  } as Partial<GameStore>);
+  useGameStore.setState(createInitialState() as Partial<GameStore>);
 }
 
 describe('GameStore', () => {
@@ -57,7 +47,7 @@ describe('GameStore', () => {
     const mockResponse: TurnResponse = {
       characterText: 'I understand.',
       assessment: { intent: 'acknowledge', engagementDelta: 2, tensionDelta: 1 },
-      presentation: { portraitState: 'hurt_exposed' },
+      presentation: { portraitState: 'connected' },
     };
     vi.mocked(postTurn).mockResolvedValue(mockResponse);
 
@@ -65,9 +55,10 @@ describe('GameStore', () => {
     await useGameStore.getState().submitTurn();
 
     const state = useGameStore.getState();
-    expect(state.transcript).toHaveLength(2);
-    expect(state.transcript[0]).toEqual({ speaker: 'player', text: 'I am sorry.' });
-    expect(state.transcript[1]).toEqual({ speaker: 'character', text: 'I understand.' });
+    expect(state.transcript).toHaveLength(3);
+    expect(state.transcript[0]).toEqual({ speaker: 'character', text: 'You said you wanted to talk.' });
+    expect(state.transcript[1]).toEqual({ speaker: 'player', text: 'I am sorry.' });
+    expect(state.transcript[2]).toEqual({ speaker: 'character', text: 'I understand.' });
     expect(state.engagement).toBe(2);
     expect(state.tension).toBe(1);
     expect(state.turnIndex).toBe(1);
@@ -87,7 +78,7 @@ describe('GameStore', () => {
     await useGameStore.getState().submitTurn();
 
     const state = useGameStore.getState();
-    // Deltas should be clamped to [-3, 3], so engagement = 3, tension = -3
+    // Deltas should be clamped to [-3, 3] by deltaBounds, then to [-10, 10] by state bounds
     expect(state.engagement).toBe(3);
     expect(state.tension).toBe(-3);
     // portraitState derived by code, not model
@@ -128,7 +119,8 @@ describe('GameStore', () => {
     expect(state.status).toBe('error');
     expect(state.error).toBe('Network error');
     expect(state.pendingMessage).toBe('Important message.');
-    expect(state.transcript).toHaveLength(0);
+    expect(state.transcript).toHaveLength(1);
+    expect(state.transcript[0]).toEqual({ speaker: 'character', text: 'You said you wanted to talk.' });
     expect(state.turnIndex).toBe(0);
   });
 
@@ -148,9 +140,10 @@ describe('GameStore', () => {
     await useGameStore.getState().retryTurn();
     const state = useGameStore.getState();
     expect(state.status).toBe('idle');
-    expect(state.transcript).toHaveLength(2);
-    expect(state.transcript[0]).toEqual({ speaker: 'player', text: 'Retry me.' });
-    expect(state.transcript[1]).toEqual({ speaker: 'character', text: 'Recovered reply.' });
+    expect(state.transcript).toHaveLength(3);
+    expect(state.transcript[0]).toEqual({ speaker: 'character', text: 'You said you wanted to talk.' });
+    expect(state.transcript[1]).toEqual({ speaker: 'player', text: 'Retry me.' });
+    expect(state.transcript[2]).toEqual({ speaker: 'character', text: 'Recovered reply.' });
     expect(state.turnIndex).toBe(1);
   });
 
@@ -159,7 +152,7 @@ describe('GameStore', () => {
       {
         characterText: 'Turn 1 reply.',
         assessment: { intent: 'acknowledge', engagementDelta: 2, tensionDelta: 2 },
-        presentation: { portraitState: 'hurt_exposed' },
+        presentation: { portraitState: 'connected' },
       },
       {
         characterText: 'Turn 2 reply.',
@@ -186,7 +179,7 @@ describe('GameStore', () => {
 
     const state = useGameStore.getState();
     expect(state.turnIndex).toBe(3);
-    expect(state.transcript).toHaveLength(6);
+    expect(state.transcript).toHaveLength(7);
 
     // State progression: (0,0) -> +2,+2 => (2,2)
     //                    (2,2) -> -3,+3 => (-1,5)
@@ -198,5 +191,84 @@ describe('GameStore', () => {
     expect(state.tension).toBeGreaterThanOrEqual(-10);
     expect(state.tension).toBeLessThanOrEqual(10);
     expect(state.portraitState).toBe('hurt_exposed');
+  });
+
+  it('completes after exactly five turns and evaluates outcome', async () => {
+    const responses: TurnResponse[] = [
+      { characterText: 'T1', assessment: { intent: 'repair', engagementDelta: 2, tensionDelta: -1 }, presentation: { portraitState: 'connected' } },
+      { characterText: 'T2', assessment: { intent: 'repair', engagementDelta: 2, tensionDelta: -1 }, presentation: { portraitState: 'connected' } },
+      { characterText: 'T3', assessment: { intent: 'repair', engagementDelta: 2, tensionDelta: -1 }, presentation: { portraitState: 'connected' } },
+      { characterText: 'T4', assessment: { intent: 'acknowledge', engagementDelta: 1, tensionDelta: -1 }, presentation: { portraitState: 'connected' } },
+      { characterText: 'T5', assessment: { intent: 'acknowledge', engagementDelta: 1, tensionDelta: -1 }, presentation: { portraitState: 'connected' } },
+    ];
+
+    let callIndex = 0;
+    vi.mocked(postTurn).mockImplementation(async () => responses[callIndex++]);
+
+    for (let i = 0; i < 5; i++) {
+      useGameStore.setState({ input: `Turn ${i + 1}` });
+      await useGameStore.getState().submitTurn();
+    }
+
+    const state = useGameStore.getState();
+    expect(state.turnIndex).toBe(5);
+    expect(state.phase).toBe('outcome');
+    expect(state.outcome).not.toBeNull();
+    expect(state.outcome!.id).toBe('even');
+  });
+
+  it('blocks a sixth submission', async () => {
+    const responses: TurnResponse[] = [
+      { characterText: 'T1', assessment: { intent: 'repair', engagementDelta: 2, tensionDelta: -1 }, presentation: { portraitState: 'connected' } },
+      { characterText: 'T2', assessment: { intent: 'repair', engagementDelta: 2, tensionDelta: -1 }, presentation: { portraitState: 'connected' } },
+      { characterText: 'T3', assessment: { intent: 'repair', engagementDelta: 2, tensionDelta: -1 }, presentation: { portraitState: 'connected' } },
+      { characterText: 'T4', assessment: { intent: 'acknowledge', engagementDelta: 1, tensionDelta: -1 }, presentation: { portraitState: 'connected' } },
+      { characterText: 'T5', assessment: { intent: 'acknowledge', engagementDelta: 1, tensionDelta: -1 }, presentation: { portraitState: 'connected' } },
+    ];
+
+    let callIndex = 0;
+    vi.mocked(postTurn).mockImplementation(async () => responses[callIndex++]);
+
+    for (let i = 0; i < 5; i++) {
+      useGameStore.setState({ input: `Turn ${i + 1}` });
+      await useGameStore.getState().submitTurn();
+    }
+
+    expect(postTurn).toHaveBeenCalledTimes(5);
+
+    useGameStore.setState({ input: 'Sixth' });
+    await useGameStore.getState().submitTurn();
+
+    expect(postTurn).toHaveBeenCalledTimes(5);
+    expect(useGameStore.getState().turnIndex).toBe(5);
+    expect(useGameStore.getState().phase).toBe('outcome');
+  });
+
+  it('restart restores initial state including opening line', async () => {
+    const mockResponse: TurnResponse = {
+      characterText: 'Reply.',
+      assessment: { intent: 'repair', engagementDelta: 2, tensionDelta: -1 },
+      presentation: { portraitState: 'connected' },
+    };
+    vi.mocked(postTurn).mockResolvedValue(mockResponse);
+
+    useGameStore.setState({ input: 'Hello' });
+    await useGameStore.getState().submitTurn();
+
+    const before = useGameStore.getState();
+    expect(before.turnIndex).toBe(1);
+    expect(before.transcript).toHaveLength(3);
+
+    useGameStore.getState().restart();
+
+    const after = useGameStore.getState();
+    const initial = createInitialState();
+    expect(after.turnIndex).toBe(0);
+    expect(after.transcript).toEqual(initial.transcript);
+    expect(after.engagement).toBe(initial.engagement);
+    expect(after.tension).toBe(initial.tension);
+    expect(after.phase).toBe('playing');
+    expect(after.outcome).toBeNull();
+    expect(after.assessments).toEqual([]);
   });
 });

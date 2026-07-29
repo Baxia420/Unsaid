@@ -1,8 +1,17 @@
 import { create } from 'zustand';
-import { TranscriptEntry, PortraitState, TurnRequest } from './types';
+import type {
+  TranscriptEntry,
+  PortraitState,
+  TurnRequest,
+  TurnAssessment,
+  ScenePhase,
+  OutcomeDef,
+} from './types';
 import { applyTurn, derivePortraitState } from './state';
 import { SCENARIO } from './scenario';
 import { postTurn } from '../lib/turnClient';
+import { canSubmitTurn } from './engine';
+import { evaluateOutcome } from './outcome';
 
 type Status = 'idle' | 'loading' | 'error';
 
@@ -16,9 +25,34 @@ export interface GameStore {
   pendingMessage: string | null;
   status: Status;
   error: string | null;
+  assessments: TurnAssessment[];
+  phase: ScenePhase;
+  outcome: OutcomeDef | null;
   setInput: (value: string) => void;
   submitTurn: () => Promise<void>;
   retryTurn: () => Promise<void>;
+  restart: () => void;
+}
+
+function createInitialState(): Omit<
+  GameStore,
+  'setInput' | 'submitTurn' | 'retryTurn' | 'restart'
+> {
+  const starting = SCENARIO.startingState;
+  return {
+    engagement: starting.engagement,
+    tension: starting.tension,
+    portraitState: derivePortraitState(starting.engagement, starting.tension),
+    transcript: [{ speaker: 'character', text: SCENARIO.openingLine }],
+    turnIndex: 0,
+    input: '',
+    pendingMessage: null,
+    status: 'idle',
+    error: null,
+    assessments: [],
+    phase: 'playing',
+    outcome: null,
+  };
 }
 
 async function executeTurn(
@@ -55,6 +89,25 @@ async function executeTurn(
       response.assessment.tensionDelta
     );
 
+    const newAssessment: TurnAssessment = {
+      intent: response.assessment.intent,
+      engagementDelta: response.assessment.engagementDelta,
+      tensionDelta: response.assessment.tensionDelta,
+    };
+    const newAssessments = [...latest.assessments, newAssessment];
+    const newTurnIndex = latest.turnIndex + 1;
+    const isComplete = newTurnIndex >= SCENARIO.totalTurns;
+
+    const outcome: OutcomeDef | null = isComplete
+      ? SCENARIO.outcomes[
+          evaluateOutcome({
+            intents: newAssessments.map((a) => a.intent),
+            finalEngagement: newState.engagement,
+            finalTension: newState.tension,
+          })
+        ]
+      : null;
+
     set({
       engagement: newState.engagement,
       tension: newState.tension,
@@ -64,11 +117,14 @@ async function executeTurn(
         { speaker: 'player', text: message },
         { speaker: 'character', text: response.characterText },
       ],
-      turnIndex: latest.turnIndex + 1,
+      turnIndex: newTurnIndex,
       input: '',
       pendingMessage: null,
       status: 'idle',
       error: null,
+      assessments: newAssessments,
+      phase: isComplete ? 'outcome' : 'playing',
+      outcome,
     });
   } catch (err) {
     set({
@@ -82,18 +138,7 @@ async function executeTurn(
 }
 
 export const useGameStore = create<GameStore>((set, get) => ({
-  engagement: SCENARIO.startingState.engagement,
-  tension: SCENARIO.startingState.tension,
-  portraitState: derivePortraitState(
-    SCENARIO.startingState.engagement,
-    SCENARIO.startingState.tension
-  ),
-  transcript: [],
-  turnIndex: 0,
-  input: '',
-  pendingMessage: null,
-  status: 'idle',
-  error: null,
+  ...createInitialState(),
 
   setInput: (value) => set({ input: value }),
 
@@ -101,7 +146,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const state = get();
     const trimmed = state.input.trim();
 
-    if (!trimmed || state.status === 'loading') return;
+    if (!trimmed || state.status === 'loading' || !canSubmitTurn(state.turnIndex, state.phase)) {
+      return;
+    }
 
     if (trimmed.length > SCENARIO.maxPlayerTextLength) {
       set({
@@ -117,9 +164,15 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   retryTurn: async () => {
     const state = get();
-    if (state.status !== 'error' || !state.pendingMessage) return;
+    if (state.status !== 'error' || !state.pendingMessage || state.phase !== 'playing') return;
 
     set({ status: 'loading', error: null });
     await executeTurn(get, set, state.pendingMessage);
   },
+
+  restart: () => {
+    set(createInitialState());
+  },
 }));
+
+export { createInitialState };

@@ -4,7 +4,7 @@ import { ModelOutputSchema } from '../server/turn/schema';
 import { TurnRequest } from '../src/game/types';
 
 const dummyRequest = (text: string): TurnRequest => ({
-  scenarioId: 'demo',
+  scenarioId: 'say-it-again',
   turnIndex: 0,
   playerText: text,
   state: { engagement: 0, tension: 0 },

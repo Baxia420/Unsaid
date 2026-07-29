@@ -3,10 +3,9 @@ import { useGameStore } from '../game/store';
 import './ConversationScene.css';
 
 const portraitLabels: Record<string, string> = {
-  distant: 'Distant',
-  defensive: 'Defensive',
-  hurt_exposed: 'Hurt / Exposed',
   connected: 'Connected',
+  guarded: 'Guarded',
+  overwhelmed: 'Overwhelmed',
 };
 
 export default function ConversationScene() {
@@ -16,14 +15,19 @@ export default function ConversationScene() {
     input,
     status,
     error,
+    phase,
+    outcome,
+    turnIndex,
     setInput,
     submitTurn,
     retryTurn,
+    restart,
   } = useGameStore();
 
   const isLoading = status === 'loading';
   const isError = status === 'error';
-  const canSubmit = input.trim().length > 0 && !isLoading;
+  const isComplete = phase === 'outcome';
+  const canSubmit = input.trim().length > 0 && !isLoading && !isComplete;
 
   return (
     <div className="conversation-scene">
@@ -48,39 +52,54 @@ export default function ConversationScene() {
         ))}
       </div>
 
-      <div className="input-area">
-        {isError && (
-          <div className="error-banner">
-            <span>{error}</span>
-            <button type="button" onClick={retryTurn} disabled={isLoading}>
-              Retry
-            </button>
-          </div>
-        )}
+      {isComplete && outcome && (
+        <div className="outcome-panel">
+          <h2>Outcome: {outcome.title}</h2>
+          <p>{outcome.description}</p>
+          <p className="debug-outcome">
+            [{outcome.id}] turn={turnIndex} portrait={portraitState}
+          </p>
+          <button type="button" onClick={restart}>
+            Restart
+          </button>
+        </div>
+      )}
 
-        <textarea
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault();
-              if (canSubmit) submitTurn();
-            }
-          }}
-          placeholder="Type your message..."
-          rows={3}
-          disabled={isLoading}
-          maxLength={SCENARIO.maxPlayerTextLength}
-        />
+      {!isComplete && (
+        <div className="input-area">
+          {isError && (
+            <div className="error-banner">
+              <span>{error}</span>
+              <button type="button" onClick={retryTurn} disabled={isLoading}>
+                Retry
+              </button>
+            </div>
+          )}
 
-        <button
-          type="button"
-          onClick={submitTurn}
-          disabled={!canSubmit}
-        >
-          {isLoading ? 'Sending...' : 'Send'}
-        </button>
-      </div>
+          <textarea
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                if (canSubmit) submitTurn();
+              }
+            }}
+            placeholder="Type your message..."
+            rows={3}
+            disabled={isLoading}
+            maxLength={SCENARIO.maxPlayerTextLength}
+          />
+
+          <button
+            type="button"
+            onClick={submitTurn}
+            disabled={!canSubmit}
+          >
+            {isLoading ? 'Sending...' : 'Send'}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

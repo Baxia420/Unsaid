@@ -55,3 +55,31 @@ export type ModelOutput = {
     tensionDelta: number;
   };
 };
+
+export type StateBounds = {
+  engagement: { min: number; max: number };
+  tension: { min: number; max: number };
+};
+
+export type DeltaBounds = {
+  engagementDelta: { min: number; max: number };
+  tensionDelta: { min: number; max: number };
+};
+
+export type GameStatus = 'idle' | 'loading' | 'error';
+
+export type OutcomeId = 'even' | 'smoothed' | 'the_speech';
+
+export interface OutcomeDef {
+  id: OutcomeId;
+  title: string;
+  description: string;
+}
+
+export type ScenePhase = 'playing' | 'outcome';
+
+export interface TurnAssessment {
+  intent: Intent;
+  engagementDelta: number;
+  tensionDelta: number;
+}

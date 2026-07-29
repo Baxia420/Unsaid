@@ -3,7 +3,7 @@ import { postTurn, TurnClientError } from '../src/lib/turnClient';
 import { TurnRequest } from '../src/game/types';
 
 const validRequest: TurnRequest = {
-  scenarioId: 'demo',
+  scenarioId: 'say-it-again',
   turnIndex: 0,
   playerText: 'Hello',
   state: { engagement: 0, tension: 0 },

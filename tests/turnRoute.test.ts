@@ -9,7 +9,7 @@ describe('POST /api/turn', () => {
     const res = await request(app)
       .post('/api/turn')
       .send({
-        scenarioId: 'demo',
+        scenarioId: 'say-it-again',
         turnIndex: 0,
         playerText: 'Hello',
         state: { engagement: 0, tension: 0 },
@@ -26,7 +26,7 @@ describe('POST /api/turn', () => {
     const res = await request(app)
       .post('/api/turn')
       .send({
-        scenarioId: 'demo',
+        scenarioId: 'say-it-again',
         turnIndex: 0,
         playerText: '',
         state: { engagement: 0, tension: 0 },
@@ -42,7 +42,7 @@ describe('POST /api/turn', () => {
     const res = await request(app)
       .post('/api/turn')
       .send({
-        scenarioId: 'demo',
+        scenarioId: 'say-it-again',
         turnIndex: 0,
         playerText: 'a'.repeat(501),
         state: { engagement: 0, tension: 0 },
@@ -57,7 +57,7 @@ describe('POST /api/turn', () => {
     const res = await request(app)
       .post('/api/turn')
       .send({
-        scenarioId: 'demo',
+        scenarioId: 'say-it-again',
         turnIndex: 0,
         playerText: 'Hello',
         state: { engagement: 100, tension: 0 },
@@ -106,7 +106,7 @@ describe('POST /api/turn', () => {
     const res = await request(app)
       .post('/api/turn')
       .send({
-        scenarioId: 'demo',
+        scenarioId: 'say-it-again',
         turnIndex: 0,
         playerText: 'Hello',
         state: { engagement: 0, tension: 0 },

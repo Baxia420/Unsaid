@@ -5,7 +5,7 @@ import { TurnRequest } from '../src/game/types';
 import { ModelAdapter } from '../server/adapters/ModelAdapter';
 
 const baseRequest = (text: string): TurnRequest => ({
-  scenarioId: 'demo',
+  scenarioId: 'say-it-again',
   turnIndex: 0,
   playerText: text,
   state: { engagement: 0, tension: 0 },
