@@ -76,7 +76,7 @@ export interface OutcomeDef {
   description: string;
 }
 
-export type ScenePhase = 'playing' | 'outcome';
+export type SceneMode = 'reality' | 'rehearsing' | 'outcome';
 
 export interface TurnAssessment {
   intent: Intent;

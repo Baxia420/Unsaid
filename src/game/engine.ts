@@ -1,5 +1,5 @@
 import { SCENARIO } from './scenario';
-import type { ScenePhase } from './types';
+import type { SceneMode } from './types';
 import type { Beat } from './scenario';
 
 export function getCurrentBeat(turnIndex: number): Beat | null {
@@ -11,6 +11,6 @@ export function isRehearsalTurn(turnIndex: number): boolean {
   return beat?.isRehearsal ?? false;
 }
 
-export function canSubmitTurn(turnIndex: number, phase: ScenePhase): boolean {
-  return phase === 'playing' && turnIndex < SCENARIO.totalTurns;
+export function canSubmitTurn(turnIndex: number, mode: SceneMode): boolean {
+  return (mode === 'reality' || mode === 'rehearsing') && turnIndex < SCENARIO.totalTurns;
 }

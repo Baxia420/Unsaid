@@ -24,6 +24,10 @@ export const SCENARIO = {
     tensionDelta: { min: -3, max: 3 },
   } as DeltaBounds,
   maxPlayerTextLength: 500,
+  imaginedResponses: {
+    2: "I know. You had a reason. I'm just glad you're here now.",
+    4: "That's all I needed to hear. We can move past it.",
+  } as Record<number, string>,
   beats: [
     {
       turn: 1,

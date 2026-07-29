@@ -4,13 +4,13 @@ import type {
   PortraitState,
   TurnRequest,
   TurnAssessment,
-  ScenePhase,
+  SceneMode,
   OutcomeDef,
 } from './types';
 import { applyTurn, derivePortraitState } from './state';
 import { SCENARIO } from './scenario';
 import { postTurn } from '../lib/turnClient';
-import { canSubmitTurn } from './engine';
+import { canSubmitTurn, isRehearsalTurn } from './engine';
 import { evaluateOutcome } from './outcome';
 
 type Status = 'idle' | 'loading' | 'error';
@@ -26,8 +26,9 @@ export interface GameStore {
   status: Status;
   error: string | null;
   assessments: TurnAssessment[];
-  phase: ScenePhase;
+  mode: SceneMode;
   outcome: OutcomeDef | null;
+  imaginedResponse: string | null;
   setInput: (value: string) => void;
   submitTurn: () => Promise<void>;
   retryTurn: () => Promise<void>;
@@ -50,8 +51,9 @@ function createInitialState(): Omit<
     status: 'idle',
     error: null,
     assessments: [],
-    phase: 'playing',
+    mode: 'reality',
     outcome: null,
+    imaginedResponse: null,
   };
 }
 
@@ -108,6 +110,15 @@ async function executeTurn(
         ]
       : null;
 
+    const nextMode: SceneMode = isComplete
+      ? 'outcome'
+      : isRehearsalTurn(newTurnIndex)
+        ? 'rehearsing'
+        : 'reality';
+    const nextImaginedResponse = nextMode === 'rehearsing'
+      ? SCENARIO.imaginedResponses[newTurnIndex + 1] ?? null
+      : null;
+
     set({
       engagement: newState.engagement,
       tension: newState.tension,
@@ -123,8 +134,9 @@ async function executeTurn(
       status: 'idle',
       error: null,
       assessments: newAssessments,
-      phase: isComplete ? 'outcome' : 'playing',
+      mode: nextMode,
       outcome,
+      imaginedResponse: nextImaginedResponse,
     });
   } catch (err) {
     set({
@@ -146,7 +158,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const state = get();
     const trimmed = state.input.trim();
 
-    if (!trimmed || state.status === 'loading' || !canSubmitTurn(state.turnIndex, state.phase)) {
+    if (!trimmed || state.status === 'loading' || !canSubmitTurn(state.turnIndex, state.mode)) {
       return;
     }
 
@@ -164,7 +176,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   retryTurn: async () => {
     const state = get();
-    if (state.status !== 'error' || !state.pendingMessage || state.phase !== 'playing') return;
+    if (state.status !== 'error' || !state.pendingMessage || state.mode === 'outcome') return;
 
     set({ status: 'loading', error: null });
     await executeTurn(get, set, state.pendingMessage);

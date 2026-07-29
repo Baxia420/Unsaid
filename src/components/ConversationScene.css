@@ -185,3 +185,42 @@
   border-radius: 8px;
   cursor: pointer;
 }
+
+.conversation-scene.rehearsing {
+  border-left: 4px solid #2563eb;
+  padding-left: 20px;
+}
+
+.mode-label {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 4px 12px;
+  border-radius: 4px;
+  background: #dbeafe;
+  color: #1e40af;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.imagined-block {
+  border: 1px dashed #2563eb;
+  border-radius: 8px;
+  padding: 12px;
+  background: #eff6ff;
+}
+
+.imagined-heading {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #1e40af;
+  margin-bottom: 6px;
+}
+
+.imagined-text {
+  font-style: italic;
+  color: #1e3a8a;
+}

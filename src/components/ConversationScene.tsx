@@ -17,9 +17,10 @@ export default function ConversationScene() {
     input,
     status,
     error,
-    phase,
+    mode,
     outcome,
     turnIndex,
+    imaginedResponse,
     setInput,
     submitTurn,
     retryTurn,
@@ -28,14 +29,16 @@ export default function ConversationScene() {
 
   const isLoading = status === 'loading';
   const isError = status === 'error';
-  const isComplete = phase === 'outcome';
+  const isComplete = mode === 'outcome';
+  const isRehearsing = mode === 'rehearsing';
   const canSubmit = input.trim().length > 0 && !isLoading && !isComplete;
 
   return (
-    <div className="conversation-scene">
+    <div className={`conversation-scene ${isRehearsing ? 'rehearsing' : ''}`}>
       <header className="scene-header">
         <h1>{SCENARIO.title}</h1>
         <p>{SCENARIO.description}</p>
+        {isRehearsing && <div className="mode-label">REHEARSE</div>}
       </header>
 
       <div className="portrait-block">
@@ -53,6 +56,13 @@ export default function ConversationScene() {
           </div>
         ))}
       </div>
+
+      {isRehearsing && input.trim().length > 0 && imaginedResponse && (
+        <div className="imagined-block">
+          <div className="imagined-heading">Imagined response</div>
+          <div className="imagined-text">{imaginedResponse}</div>
+        </div>
+      )}
 
       {isComplete && outcome && (
         <div className="outcome-panel">
@@ -72,9 +82,11 @@ export default function ConversationScene() {
           {isError && (
             <div className="error-banner">
               <span>{error}</span>
-              <button type="button" onClick={retryTurn} disabled={isLoading}>
-                Retry
-              </button>
+              {!isRehearsing && (
+                <button type="button" onClick={retryTurn} disabled={isLoading}>
+                  Retry
+                </button>
+              )}
             </div>
           )}
 
@@ -87,7 +99,7 @@ export default function ConversationScene() {
                 if (canSubmit) submitTurn();
               }
             }}
-            placeholder="Type your message..."
+            placeholder={isRehearsing ? 'Draft what you want to say...' : 'Type your message...'}
             rows={3}
             disabled={isLoading}
             maxLength={SCENARIO.maxPlayerTextLength}
@@ -98,7 +110,7 @@ export default function ConversationScene() {
             onClick={submitTurn}
             disabled={!canSubmit}
           >
-            {isLoading ? 'Sending...' : 'Send'}
+            {isLoading ? 'Sending...' : isRehearsing ? 'SAY' : 'Send'}
           </button>
         </div>
       )}
