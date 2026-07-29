@@ -34,16 +34,20 @@
   transition: background 0.2s ease;
 }
 
-.portrait-connected {
-  background: #10b981;
+.portrait-distant {
+  background: #9ca3af;
 }
 
-.portrait-guarded {
+.portrait-defensive {
+  background: #ef4444;
+}
+
+.portrait-hurt_exposed {
   background: #f59e0b;
 }
 
-.portrait-overwhelmed {
-  background: #ef4444;
+.portrait-connected {
+  background: #10b981;
 }
 
 .portrait-label {

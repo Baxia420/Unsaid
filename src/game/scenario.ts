@@ -12,6 +12,7 @@ export const SCENARIO = {
   title: "Say It Again",
   description: "A difficult café apology with a close friend.",
   openingLine: "You said you wanted to talk.",
+  fallbackCharacterLine: "I'm not sure how to respond to that.",
   totalTurns: 5,
   startingState: { engagement: 0, tension: 0 },
   bounds: {

@@ -1,5 +1,6 @@
 import { TurnRequest, TurnResponse } from '../../src/game/types';
 import { applyTurn, derivePortraitState } from '../../src/game/state';
+import { SCENARIO } from '../../src/game/scenario';
 import { ModelAdapter } from '../adapters/ModelAdapter';
 import { ModelOutputSchema } from './schema';
 
@@ -52,7 +53,7 @@ function makeFallback(request: TurnRequest): TurnResponse {
   );
 
   return {
-    characterText: "I'm not sure how to respond to that.",
+    characterText: SCENARIO.fallbackCharacterLine,
     assessment: {
       intent: 'unclear',
       engagementDelta: 0,

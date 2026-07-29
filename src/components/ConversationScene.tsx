@@ -1,11 +1,13 @@
 import { SCENARIO } from '../game/scenario';
 import { useGameStore } from '../game/store';
+import type { PortraitState } from '../game/types';
 import './ConversationScene.css';
 
-const portraitLabels: Record<string, string> = {
+const portraitLabels: Record<PortraitState, string> = {
+  distant: 'Distant',
+  defensive: 'Defensive',
+  hurt_exposed: 'Hurt / Exposed',
   connected: 'Connected',
-  guarded: 'Guarded',
-  overwhelmed: 'Overwhelmed',
 };
 
 export default function ConversationScene() {
