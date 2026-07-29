@@ -1,6 +1,6 @@
 import express, { ErrorRequestHandler } from 'express';
 import { createTurnRouter } from './turn/route';
-import { MockModelAdapter } from './adapters/MockModelAdapter';
+import { createModelAdapter } from './adapters/factory';
 
 const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
   if (err instanceof SyntaxError && 'body' in err) {
@@ -25,7 +25,7 @@ export function createApp(): express.Express {
   const app = express();
   app.use(express.json());
 
-  const adapter = new MockModelAdapter('valid');
+  const adapter = createModelAdapter();
   app.use('/api/turn', createTurnRouter(adapter));
 
   app.use(errorHandler);

@@ -13,7 +13,7 @@ Stage 0 is a fully playable, end-to-end conversation slice with deterministic mo
 - Automated test coverage for state machines, Zod schemas, the turn service, the API route, the mock adapter, the client store, and the HTTP client.
 - A single placeholder scenario (Cafe Apology) that supports a short 3–5 turn conversation.
 
-No live AI provider is connected; all responses come from `MockModelAdapter`.
+A live AI adapter is available via Google Gemini Developer API. By default, all responses come from `MockModelAdapter`.
 
 ## Prerequisites
 
@@ -26,7 +26,21 @@ No live AI provider is connected; all responses come from `MockModelAdapter`.
 npm install
 ```
 
-No environment variables are required for the current Stage 0 path.
+## Environment Variables
+
+Copy `.env.example` to `.env` and set variables as needed:
+
+| Variable | Default | Description |
+|---|---|---|
+| `UNSAID_AI_MODE` | `mock` | `mock` for deterministic local responses; `live` for Gemini |
+| `GEMINI_API_KEY` | *(none)* | Google AI Studio API key (required only for live mode) |
+| `GEMINI_BASE_URL` | `https://generativelanguage.googleapis.com/v1beta/openai` | Gemini OpenAI-compatible endpoint |
+| `GEMINI_MODEL` | `gemini-3.6-flash` | Model identifier |
+| `GEMINI_TIMEOUT_MS` | `15000` | Request timeout in milliseconds |
+
+**Default is mock.** No API key or paid account is required to run or develop locally.
+
+**Live mode** uses the Google Gemini Developer API via Google AI Studio. The intended configuration uses the **Google AI Studio free tier** and does not require enabling billing. If `UNSAID_AI_MODE=live` is set but `GEMINI_API_KEY` is missing or blank, the server emits one warning and falls back to the mock adapter for that run.
 
 ## Development
 
@@ -55,7 +69,17 @@ All requests to `/api/*` from the browser are proxied to the Express server (`ht
 
 The default runtime uses **`MockModelAdapter`** and requires no paid API key. No `.env` file or provider secrets are needed.
 
-To connect a live server-side adapter in the future, implement `ModelAdapter` (see `server/adapters/ModelAdapter.ts`) and replace the `MockModelAdapter` instance in `server/index.ts` with the live implementation.
+To enable live inference, set `UNSAID_AI_MODE=live` and provide a `GEMINI_API_KEY` in `.env`.
+
+## Live Evaluation
+
+Run the live evaluation corpus against Gemini:
+
+```bash
+npm run evaluate:live
+```
+
+This requires `UNSAID_AI_MODE=live` and a valid `GEMINI_API_KEY`. It runs 12 café-apology test inputs and reports exact intent classification accuracy and schema validation results. This script is not part of `npm run test` and never runs automatically.
 
 ## Tested Fallback Behavior
 
@@ -153,7 +177,6 @@ These deltas are clamped to `[-3, 3]` per turn and accumulated state is clamped 
 
 ## Known Limitations
 
-- **Mock inference only** — no live model provider is connected.
 - **One placeholder scenario** — the Cafe Apology scene is a short conversation slice, not the final story.
 - **Placeholder visuals and minimal CSS** — the current UI is functional but not final artwork.
 - **No REHEARSE/SAY mechanic yet** — this is the central design feature of the full game and will be implemented in a later stage.
@@ -161,6 +184,7 @@ These deltas are clamped to `[-3, 3]` per turn and accumulated state is clamped 
 - The client currently sends the **accumulated transcript** as `recentTranscript`; the current slice is designed and verified for a short placeholder conversation.
 - `portraitState` is temporarily visible in the interface for debugging purposes.
 - **Engagement and Tension remain hidden** from the interface; they are code-owned state axes only.
+- **Live fallback** — if the Gemini provider times out, returns a non-2xx response, produces invalid JSON, or returns schema-invalid output, the turn falls back to the deterministic mock response automatically. The game remains playable.
 
 ## License
 

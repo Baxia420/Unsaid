@@ -21,9 +21,11 @@ export const ModelOutputSchema = z.object({
   assessment: z.object({
     intent: IntentSchema,
     engagementDelta: z.number()
+      .int()
       .min(SCENARIO.deltaBounds.engagementDelta.min)
       .max(SCENARIO.deltaBounds.engagementDelta.max),
     tensionDelta: z.number()
+      .int()
       .min(SCENARIO.deltaBounds.tensionDelta.min)
       .max(SCENARIO.deltaBounds.tensionDelta.max),
   }),

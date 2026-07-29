@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { createApp } from './server/index';
 
 const PORT = 3001;

@@ -95,4 +95,28 @@ describe('ModelOutputSchema', () => {
     });
     expect(result.success).toBe(false);
   });
+
+  it('rejects fractional engagementDelta', () => {
+    const result = ModelOutputSchema.safeParse({
+      characterText: 'Hello',
+      assessment: {
+        intent: 'acknowledge',
+        engagementDelta: 1.5,
+        tensionDelta: 0,
+      },
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects fractional tensionDelta', () => {
+    const result = ModelOutputSchema.safeParse({
+      characterText: 'Hello',
+      assessment: {
+        intent: 'acknowledge',
+        engagementDelta: 0,
+        tensionDelta: -2.7,
+      },
+    });
+    expect(result.success).toBe(false);
+  });
 });
