@@ -54,7 +54,7 @@ export class GeminiModelAdapter implements ModelAdapter {
       process.env.GEMINI_BASE_URL ||
       'https://generativelanguage.googleapis.com/v1beta/openai';
     this.apiKey = process.env.GEMINI_API_KEY || '';
-    this.model = process.env.GEMINI_MODEL || 'gemini-3.6-flash';
+    this.model = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
     this.timeoutMs = parseInt(process.env.GEMINI_TIMEOUT_MS || '15000', 10);
   }
 

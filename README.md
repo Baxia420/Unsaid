@@ -35,7 +35,7 @@ Copy `.env.example` to `.env` and set variables as needed:
 | `UNSAID_AI_MODE` | `mock` | `mock` for deterministic local responses; `live` for Gemini |
 | `GEMINI_API_KEY` | *(none)* | Google AI Studio API key (required only for live mode) |
 | `GEMINI_BASE_URL` | `https://generativelanguage.googleapis.com/v1beta/openai` | Gemini OpenAI-compatible endpoint |
-| `GEMINI_MODEL` | `gemini-3.6-flash` | Model identifier |
+| `GEMINI_MODEL` | `gemini-2.5-flash` | Model identifier |
 | `GEMINI_TIMEOUT_MS` | `15000` | Request timeout in milliseconds |
 
 **Default is mock.** No API key or paid account is required to run or develop locally.
@@ -179,12 +179,12 @@ These deltas are clamped to `[-3, 3]` per turn and accumulated state is clamped 
 
 - **One placeholder scenario** — the Cafe Apology scene is a short conversation slice, not the final story.
 - **Placeholder visuals and minimal CSS** — the current UI is functional but not final artwork.
-- **No REHEARSE/SAY mechanic yet** — this is the central design feature of the full game and will be implemented in a later stage.
+- **REHEARSE/SAY** — implemented: REHEARSE is local and SAY is routed through the selected server adapter.
 - **No final story, endings, artwork, audio, animation, deployment, database, accounts, or analytics.**
 - The client currently sends the **accumulated transcript** as `recentTranscript`; the current slice is designed and verified for a short placeholder conversation.
 - `portraitState` is temporarily visible in the interface for debugging purposes.
 - **Engagement and Tension remain hidden** from the interface; they are code-owned state axes only.
-- **Live fallback** — if the Gemini provider times out, returns a non-2xx response, produces invalid JSON, or returns schema-invalid output, the turn falls back to the deterministic mock response automatically. The game remains playable.
+- **Live fallback** — if the Gemini provider times out, returns a non-2xx response, produces invalid JSON, or returns schema-invalid output, the turn falls back to the deterministic scenario-owned fallback response automatically. The game remains playable.
 
 ## License
 

@@ -207,10 +207,14 @@ async function main() {
         returnedIntent = parsed.data.assessment.intent;
         characterText = parsed.data.characterText;
       } else {
-        characterText = '[schema invalid]';
+        console.error(`Case ${testCase.name}: schema validation failed`);
+        console.error(parsed.error.format());
+        process.exit(1);
       }
     } catch (err) {
-      characterText = err instanceof Error ? err.message : String(err);
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`Case ${testCase.name}: API/provider error — ${msg}`);
+      process.exit(1);
     }
 
     const intentPass = returnedIntent === testCase.expectedIntent;
@@ -225,7 +229,7 @@ async function main() {
     console.log(`  Reply: ${characterText}`);
     console.log();
 
-    await delay(5000);
+    await delay(15000);
   }
 
   console.log(`Results: ${intentPassCount}/${evalCases.length} intent classifications correct`);
