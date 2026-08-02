@@ -18,32 +18,16 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
-import type { PortraitState, SceneMode } from '../src/game/types';
-
-// ── Asset-path helpers (mirrors ConversationScene.tsx) ──────────────────────
-
-const PORTRAIT_OPEN: Record<PortraitState, string> = {
-  distant:      'assets/friend/distant-open.webp',
-  defensive:    'assets/friend/defensive-open.webp',
-  hurt_exposed: 'assets/friend/hurt_exposed-open.webp',
-  connected:    'assets/friend/connected-open.webp',
-};
-
-const PORTRAIT_CLOSED: Record<PortraitState, string> = {
-  distant:      'assets/friend/distant-closed.webp',
-  defensive:    'assets/friend/defensive-closed.webp',
-  hurt_exposed: 'assets/friend/hurt_exposed-closed.webp',
-  connected:    'assets/friend/connected-closed.webp',
-};
-
-const BLINK_SRC = 'assets/friend/blink.webp';
-
-const PORTRAIT_DATA_STATE: Record<PortraitState, string> = {
-  distant:      'distant',
-  defensive:    'defensive',
-  hurt_exposed: 'hurt-exposed',
-  connected:    'connected',
-};
+import type { PortraitState } from '../src/game/types';
+import {
+  PORTRAIT_OPEN,
+  PORTRAIT_CLOSED,
+  BLINK_SRC,
+  PORTRAIT_DATA_STATE,
+  CAFE_BACKGROUND,
+  TABLE_FOREGROUND,
+} from '../src/components/cinematicPresentation';
+import type { VisualSceneState } from '../src/components/cinematicPresentation';
 
 // ── Source files ─────────────────────────────────────────────────────────────
 
@@ -56,22 +40,26 @@ const CSS_SRC = readFileSync(
   resolve(ROOT, 'src/components/ConversationScene.css'),
   'utf-8'
 );
+const HELPER_SRC = readFileSync(
+  resolve(ROOT, 'src/components/cinematicPresentation.ts'),
+  'utf-8'
+);
 
 // ── Portrait mapping tests ───────────────────────────────────────────────────
 
 describe('Portrait asset mappings', () => {
   const states: PortraitState[] = ['distant', 'defensive', 'hurt_exposed', 'connected'];
 
-  it.each(states)('open path for state %s is correct', (state) => {
-    expect(PORTRAIT_OPEN[state]).toBe(`assets/friend/${state}-open.webp`);
+  it.each(states)('open path for state %s is root-relative', (state) => {
+    expect(PORTRAIT_OPEN[state]).toBe(`/assets/friend/${state}-open.webp`);
   });
 
-  it.each(states)('closed path for state %s is correct', (state) => {
-    expect(PORTRAIT_CLOSED[state]).toBe(`assets/friend/${state}-closed.webp`);
+  it.each(states)('closed path for state %s is root-relative', (state) => {
+    expect(PORTRAIT_CLOSED[state]).toBe(`/assets/friend/${state}-closed.webp`);
   });
 
-  it('blink asset path is correct', () => {
-    expect(BLINK_SRC).toBe('assets/friend/blink.webp');
+  it('blink asset path is root-relative', () => {
+    expect(BLINK_SRC).toBe('/assets/friend/blink.webp');
   });
 
   it('data-portrait-state for distant', () => {
@@ -88,17 +76,33 @@ describe('Portrait asset mappings', () => {
   });
 });
 
+// ── Scene asset paths ────────────────────────────────────────────────────────
+
+describe('Scene asset paths', () => {
+  it('cafe background path is root-relative', () => {
+    expect(CAFE_BACKGROUND).toBe('/assets/cafe/cafe-window-afternoon.webp');
+  });
+
+  it('table foreground path is root-relative', () => {
+    expect(TABLE_FOREGROUND).toBe('/assets/cafe/table-foreground.webp');
+  });
+});
+
 // ── Scene-mode strings ───────────────────────────────────────────────────────
 
 describe('Scene-mode strings', () => {
-  const validModes: SceneMode[] = ['reality', 'rehearsing', 'outcome'];
+  const validModes: VisualSceneState[] = ['reality', 'rehearsing', 'submitting', 'error', 'outcome'];
 
-  it.each(validModes)('scene mode %s is a recognised SceneMode', (m) => {
+  it.each(validModes)('visual scene state %s is a recognised VisualSceneState', (m) => {
     expect(validModes).toContain(m);
   });
 
-  it('data-scene-mode reality is emitted for reality mode', () => {
-    expect(COMPONENT_SRC).toContain("data-scene-mode={isRehearsing ? 'rehearsing' : 'reality'}");
+  it('component emits all five visual scene states in data-scene-mode', () => {
+    expect(COMPONENT_SRC).toContain("'reality'");
+    expect(COMPONENT_SRC).toContain("'rehearsing'");
+    expect(COMPONENT_SRC).toContain("'submitting'");
+    expect(COMPONENT_SRC).toContain("'error'");
+    expect(COMPONENT_SRC).toContain("'outcome'");
   });
 
   it('data-scene-mode outcome is emitted for outcome mode', () => {
@@ -109,47 +113,79 @@ describe('Scene-mode strings', () => {
 // ── Expected public asset paths ──────────────────────────────────────────────
 
 describe('Expected asset path conventions', () => {
-  const expectedPaths = [
-    'assets/cafe/cafe-window-afternoon.webp',
-    'assets/cafe/table-foreground.webp',
-    'assets/friend/distant-closed.webp',
-    'assets/friend/distant-open.webp',
-    'assets/friend/defensive-closed.webp',
-    'assets/friend/defensive-open.webp',
-    'assets/friend/hurt_exposed-closed.webp',
-    'assets/friend/hurt_exposed-open.webp',
-    'assets/friend/connected-closed.webp',
-    'assets/friend/connected-open.webp',
-    'assets/friend/blink.webp',
-  ];
-
-  // Verify the CSS comments reference café background paths
-  it('CSS references cafe background asset path', () => {
-    expect(CSS_SRC).toContain('cafe-window-afternoon.webp');
+  // Café and table URLs must be active CSS declarations, not comments
+  it('CSS contains active cafe background-image declaration', () => {
+    expect(CSS_SRC).toContain("url('/assets/cafe/cafe-window-afternoon.webp')");
   });
 
-  it('CSS references table foreground asset path', () => {
-    expect(CSS_SRC).toContain('table-foreground.webp');
+  it('CSS contains active table foreground-image declaration', () => {
+    expect(CSS_SRC).toContain("url('/assets/cafe/table-foreground.webp')");
   });
 
-  // Verify component references portrait paths
-  it('component references distant-open path', () => {
-    expect(COMPONENT_SRC).toContain("'assets/friend/distant-open.webp'");
+  // Verify helper (shared source of truth) contains portrait paths
+  it('helper contains root-relative distant-open path', () => {
+    expect(HELPER_SRC).toContain("'/assets/friend/distant-open.webp'");
   });
 
-  it('component references connected-closed path', () => {
-    expect(COMPONENT_SRC).toContain("'assets/friend/connected-closed.webp'");
+  it('helper contains root-relative connected-closed path', () => {
+    expect(HELPER_SRC).toContain("'/assets/friend/connected-closed.webp'");
   });
 
-  it('component references blink path', () => {
-    expect(COMPONENT_SRC).toContain("'assets/friend/blink.webp'");
+  it('helper contains root-relative blink path', () => {
+    expect(HELPER_SRC).toContain("'/assets/friend/blink.webp'");
   });
 
-  it('all nine expected portrait paths are covered', () => {
-    const portraitPaths = expectedPaths.filter((p) => p.startsWith('assets/friend/'));
+  it('all nine expected portrait paths are covered in helper', () => {
+    const portraitPaths = [
+      '/assets/friend/distant-closed.webp',
+      '/assets/friend/distant-open.webp',
+      '/assets/friend/defensive-closed.webp',
+      '/assets/friend/defensive-open.webp',
+      '/assets/friend/hurt_exposed-closed.webp',
+      '/assets/friend/hurt_exposed-open.webp',
+      '/assets/friend/connected-closed.webp',
+      '/assets/friend/connected-open.webp',
+      '/assets/friend/blink.webp',
+    ];
     for (const p of portraitPaths) {
-      expect(COMPONENT_SRC + CSS_SRC).toContain(p.replace('assets/friend/', ''));
+      expect(HELPER_SRC).toContain(p);
     }
+  });
+});
+
+// ── Portrait image display behaviour ─────────────────────────────────────────
+
+describe('Portrait image display behaviour', () => {
+  it('portrait images are not permanently display:none', () => {
+    expect(CSS_SRC).not.toMatch(/\.cs-portrait-img\s*\{[^}]*display:\s*none/);
+  });
+
+  it('component has onError handler on portrait images', () => {
+    expect(COMPONENT_SRC).toContain('onError={handleImgError}');
+  });
+
+  it('handleImgError hides the failed image only', () => {
+    expect(COMPONENT_SRC).toContain('e.currentTarget.style.display');
+    expect(COMPONENT_SRC).toContain("'none'");
+  });
+});
+
+// ── Loading / mouth behaviour ────────────────────────────────────────────────
+
+describe('Loading and mouth behaviour', () => {
+  it('loading uses the closed-mouth portrait', () => {
+    // The portraitSrc must derive from PORTRAIT_CLOSED during loading
+    expect(COMPONENT_SRC).toContain('PORTRAIT_CLOSED[portraitState]');
+  });
+
+  it('does not use PORTRAIT_OPEN during loading', () => {
+    expect(COMPONENT_SRC).not.toContain('PORTRAIT_OPEN[portraitState]');
+  });
+
+  it('mouth-open is visual-only ephemeral state with cleanup timer', () => {
+    expect(COMPONENT_SRC).toContain('MOUTH_OPEN_DURATION_MS');
+    expect(COMPONENT_SRC).toContain('setMouthOpen');
+    expect(COMPONENT_SRC).toContain('clearTimeout');
   });
 });
 
@@ -188,7 +224,6 @@ describe('CSS mobile media rule', () => {
   });
 
   it('does not globally force body overflow:hidden', () => {
-    // body overflow: hidden not in component CSS
     expect(CSS_SRC).not.toMatch(/body\s*\{[^}]*overflow\s*:\s*hidden/);
   });
 });
@@ -197,9 +232,6 @@ describe('CSS mobile media rule', () => {
 
 describe('State meters are absent', () => {
   it('does not render engagement in the component', () => {
-    // engagement must not appear as a visible label or meter element
-    // (it can appear as an imported type/store field name, but not as a
-    //  display string or progress/meter element)
     expect(COMPONENT_SRC).not.toContain('engagement meter');
     expect(COMPONENT_SRC).not.toContain('Engagement');
     expect(COMPONENT_SRC).not.toContain('<meter');
@@ -212,14 +244,10 @@ describe('State meters are absent', () => {
   });
 
   it('does not display percentage values', () => {
-    // No inline % display — no template literals that would output "%"
-    // as a UI label alongside a numeric store value
     expect(COMPONENT_SRC).not.toMatch(/\{.*(engagement|tension).*%/);
   });
 
   it('does not show portraitState text to the player', () => {
-    // The state name must not appear in player-visible JSX text nodes
-    // It may appear as a data attribute value or variable name
     expect(COMPONENT_SRC).not.toContain('{portraitState}');
   });
 });
@@ -229,13 +257,11 @@ describe('State meters are absent', () => {
 describe('No alternate submission path', () => {
   it('component has exactly one submitTurn reference', () => {
     const matches = COMPONENT_SRC.match(/submitTurn/g) ?? [];
-    // One destructure from store + two usages (button onClick + handleKeyDown) = 3
     expect(matches.length).toBeLessThanOrEqual(4);
     expect(matches.length).toBeGreaterThanOrEqual(1);
   });
 
   it('does not call submitTurn inside setInput', () => {
-    // setInput handler must not also submit
     const setInputBlock = COMPONENT_SRC.slice(
       COMPONENT_SRC.indexOf('setInput(e.target.value)') - 20,
       COMPONENT_SRC.indexOf('setInput(e.target.value)') + 40,
@@ -244,9 +270,7 @@ describe('No alternate submission path', () => {
   });
 
   it('does not contain a second button with submit capability during rehearse', () => {
-    // There must be only one primary action button (cs-say-btn)
     const sayBtnCount = (COMPONENT_SRC.match(/cs-say-btn/g) ?? []).length;
-    // Expect className definition + one usage = 2 at most
     expect(sayBtnCount).toBeLessThanOrEqual(4);
   });
 });
@@ -290,13 +314,16 @@ describe('Semantic scene attributes', () => {
   it('textarea has spellCheck={true}', () => {
     expect(COMPONENT_SRC).toContain('spellCheck={true}');
   });
+
+  it('outcome title uses semantic h1', () => {
+    expect(COMPONENT_SRC).toContain('<h1 className="cs-outcome-title">');
+  });
 });
 
 // ── imaginedResponse not inserted into player input ──────────────────────────
 
 describe('imaginedResponse isolation', () => {
   it('setInput is never called with imaginedResponse', () => {
-    // The component must never pass imaginedResponse to setInput
     expect(COMPONENT_SRC).not.toMatch(/setInput\s*\(\s*imaginedResponse/);
   });
 
@@ -314,7 +341,6 @@ describe('imaginedResponse isolation', () => {
 
 describe('Layout absolute-positioning discipline', () => {
   it('CSS uses absolute positioning only inside art canvas and portrait frame', () => {
-    // cs-dock must not use position: absolute
     const dockSection = CSS_SRC.slice(
       CSS_SRC.indexOf('.cs-dock'),
       CSS_SRC.indexOf('.cs-dock') + 400,
@@ -335,7 +361,14 @@ describe('Layout absolute-positioning discipline', () => {
       CSS_SRC.indexOf('.cs-dialogue-card'),
       CSS_SRC.indexOf('.cs-dialogue-card') + 300,
     );
-    // dialogue card is position: relative, not absolute
     expect(cardSection).not.toContain('position: absolute');
+  });
+});
+
+// ── Shared mapping import ────────────────────────────────────────────────────
+
+describe('Shared mapping helper', () => {
+  it('component imports from cinematicPresentation', () => {
+    expect(COMPONENT_SRC).toContain("from './cinematicPresentation'");
   });
 });

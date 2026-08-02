@@ -117,21 +117,20 @@
   overflow: hidden;
 }
 
-/* Background layer */
+/* Background layer — layered: real asset on top, gradient fallback below */
 .cs-background {
   position: absolute;
   inset: 0;
   background:
+    url('/assets/cafe/cafe-window-afternoon.webp'),
     linear-gradient(
       160deg,
       #1a1510 0%,
       #0d1018 55%,
       #0a0c10 100%
     );
-  /* When cafe-window-afternoon.webp is available: */
-  /* background-image: url('/assets/cafe/cafe-window-afternoon.webp'); */
-  /* background-size: cover; */
-  /* background-position: center 30%; */
+  background-size: cover, cover;
+  background-position: center 30%, center 30%;
 }
 
 /* Subtle window light effect — intentionally designed placeholder */
@@ -191,12 +190,13 @@
   object-fit: contain;
   object-position: bottom center;
   user-select: none;
-  /* Hidden until artwork is present */
-  display: none;
 }
 
-/* When artwork files exist they will be shown;
-   hide-by-default prevents broken-image icons */
+/* Blink frame is hidden by default; toggled via animation or JS */
+.cs-portrait-blink {
+  opacity: 0;
+  pointer-events: none;
+}
 
 /* Silhouette placeholder — styled by state, visible before artwork */
 .cs-portrait-silhouette {
@@ -244,23 +244,23 @@
   box-shadow: 0 0 20px rgba(200, 170, 100, 0.10);
 }
 
-/* Table foreground */
+/* Table foreground — layered: real asset on top, gradient fallback below */
 .cs-table-foreground {
   position: absolute;
   bottom: 0;
   left: 0;
   right: 0;
   height: 28%;
-  background: linear-gradient(
-    to top,
-    rgba(8, 6, 4, 0.95) 0%,
-    rgba(18, 14, 10, 0.70) 50%,
-    transparent 100%
-  );
-  /* When table-foreground.webp is available: */
-  /* background-image: url('/assets/cafe/table-foreground.webp'); */
-  /* background-size: cover; */
-  /* background-position: center top; */
+  background:
+    url('/assets/cafe/table-foreground.webp'),
+    linear-gradient(
+      to top,
+      rgba(8, 6, 4, 0.95) 0%,
+      rgba(18, 14, 10, 0.70) 50%,
+      transparent 100%
+    );
+  background-size: cover, cover;
+  background-position: center top, center top;
 }
 
 /* Vignette overlay */

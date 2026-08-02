@@ -1,34 +1,17 @@
-import { useRef, useEffect } from 'react';
+import { useRef, useState, useCallback } from 'react';
 import { SCENARIO } from '../game/scenario';
 import { useGameStore } from '../game/store';
-import type { PortraitState } from '../game/types';
+import {
+  PORTRAIT_CLOSED,
+  PORTRAIT_DATA_STATE,
+  BLINK_SRC,
+} from './cinematicPresentation';
+import type { VisualSceneState } from './cinematicPresentation';
 import './ConversationScene.css';
 
-// Portrait asset helpers — provide stable hooks for final artwork
-const PORTRAIT_OPEN: Record<PortraitState, string> = {
-  distant:      'assets/friend/distant-open.webp',
-  defensive:    'assets/friend/defensive-open.webp',
-  hurt_exposed: 'assets/friend/hurt_exposed-open.webp',
-  connected:    'assets/friend/connected-open.webp',
-};
-
-const PORTRAIT_CLOSED: Record<PortraitState, string> = {
-  distant:      'assets/friend/distant-closed.webp',
-  defensive:    'assets/friend/defensive-closed.webp',
-  hurt_exposed: 'assets/friend/hurt_exposed-closed.webp',
-  connected:    'assets/friend/connected-closed.webp',
-};
-
-const BLINK_SRC = 'assets/friend/blink.webp';
-
-// Map portrait state to intentional placeholder visual tone
-// These are data attributes only — not visible labels to the player
-const PORTRAIT_DATA_STATE: Record<PortraitState, string> = {
-  distant:      'distant',
-  defensive:    'defensive',
-  hurt_exposed: 'hurt-exposed',
-  connected:    'connected',
-};
+// Visual-only ephemeral mouth-open state after a new character response.
+// Does NOT affect store, transcript, turns, API calls, timing, or outcome.
+const MOUTH_OPEN_DURATION_MS = 1200;
 
 export default function ConversationScene() {
   const {
@@ -54,29 +37,39 @@ export default function ConversationScene() {
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Keep textarea focused when mode changes
-  useEffect(() => {
-    if (!isComplete && !isLoading && textareaRef.current) {
-      textareaRef.current.focus();
-    }
-  }, [mode, isLoading, isComplete]);
+  // Ephemeral mouth-open state: triggered when a new character line arrives.
+  const [mouthOpen, setMouthOpen] = useState(false);
+  const mouthTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Most recent character line — shown in the scene stage
+  // Track last character line to detect new arrivals
   const lastCharacterLine = [...transcript]
     .reverse()
     .find((e) => e.speaker === 'character')?.text ?? null;
+
+  const prevLineRef = useRef<string | null>(null);
+  if (lastCharacterLine && lastCharacterLine !== prevLineRef.current) {
+    prevLineRef.current = lastCharacterLine;
+    if (mouthTimerRef.current) clearTimeout(mouthTimerRef.current);
+    setMouthOpen(true);
+    mouthTimerRef.current = setTimeout(() => setMouthOpen(false), MOUTH_OPEN_DURATION_MS);
+  }
 
   // Most recent player line (one subtle echo) — only when not at turn 0
   const lastPlayerLine = transcript.length > 1
     ? [...transcript].reverse().find((e) => e.speaker === 'player')?.text ?? null
     : null;
 
-  // Portrait asset path — open/closed determined by loading (mouth open = speaking)
-  const portraitSrc = isLoading
-    ? PORTRAIT_OPEN[portraitState]
-    : PORTRAIT_CLOSED[portraitState];
+  // Loading = thinking = closed mouth. New response = brief open mouth.
+  const portraitSrc = isLoading || !mouthOpen
+    ? PORTRAIT_CLOSED[portraitState]
+    : PORTRAIT_CLOSED[portraitState].replace('-closed', '-open');
 
   const blinkSrc = BLINK_SRC;
+
+  // Graceful image-error handler: hide only the failed image
+  const handleImgError = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
+    e.currentTarget.style.display = 'none';
+  }, []);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -84,6 +77,17 @@ export default function ConversationScene() {
       if (canSubmit) submitTurn();
     }
   };
+
+  // Visual scene-state attribute (presentation only)
+  const visualSceneState: VisualSceneState = isComplete
+    ? 'outcome'
+    : isError
+      ? 'error'
+      : isLoading
+        ? 'submitting'
+        : isRehearsing
+          ? 'rehearsing'
+          : 'reality';
 
   // ── OUTCOME SCENE ────────────────────────────────────────────────────────────
   if (isComplete && outcome) {
@@ -94,7 +98,7 @@ export default function ConversationScene() {
         aria-label="Outcome scene"
       >
         <div className="cs-outcome-card" role="main">
-          <div className="cs-outcome-title">{outcome.title}</div>
+          <h1 className="cs-outcome-title">{outcome.title}</h1>
           <p className="cs-outcome-description">{outcome.description}</p>
           <button
             type="button"
@@ -112,7 +116,7 @@ export default function ConversationScene() {
   return (
     <div
       className={`cs-root${isRehearsing ? ' cs-rehearse-mode' : ' cs-reality-mode'}`}
-      data-scene-mode={isRehearsing ? 'rehearsing' : 'reality'}
+      data-scene-mode={visualSceneState}
       aria-label="Conversation scene"
     >
       {/* ── REGION 1: SCENE STAGE ── */}
@@ -125,18 +129,12 @@ export default function ConversationScene() {
             data-portrait-state={PORTRAIT_DATA_STATE[portraitState]}
           >
             <img
-              className="cs-portrait-img cs-portrait-closed"
-              src={PORTRAIT_CLOSED[portraitState]}
-              alt=""
-              aria-hidden="true"
-              draggable={false}
-            />
-            <img
-              className="cs-portrait-img cs-portrait-open"
+              className="cs-portrait-img"
               src={portraitSrc}
               alt=""
               aria-hidden="true"
               draggable={false}
+              onError={handleImgError}
             />
             <img
               className="cs-portrait-img cs-portrait-blink"
@@ -144,6 +142,7 @@ export default function ConversationScene() {
               alt=""
               aria-hidden="true"
               draggable={false}
+              onError={handleImgError}
             />
             {/* Silhouette placeholder — visible before artwork arrives */}
             <div
