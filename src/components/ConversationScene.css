@@ -3,6 +3,18 @@
    Stage 1 Milestone 4A
    ═══════════════════════════════════════════════════════ */
 
+/* ── GLOBAL RESET (scoped to app root) ────────────────── */
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  background: #090a0c;
+}
+
+html {
+  /* Prevent unintended desktop vertical scrollbar */
+  overflow-y: auto;
+}
+
 /* ── CUSTOM PROPERTIES ─────────────────────────────────── */
 :root {
   --cs-font:        system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
