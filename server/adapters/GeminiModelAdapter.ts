@@ -11,7 +11,6 @@ interface GeminiGenerateContentRequest {
     parts: Array<{ text: string }>;
   }>;
   generationConfig: {
-    temperature: number;
     maxOutputTokens: number;
     responseMimeType: 'application/json';
     responseSchema: {
@@ -86,7 +85,7 @@ export class GeminiModelAdapter implements ModelAdapter {
       process.env.GEMINI_BASE_URL ||
       'https://generativelanguage.googleapis.com/v1beta';
     this.apiKey = process.env.GEMINI_API_KEY || '';
-    this.model = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+    this.model = process.env.GEMINI_MODEL || 'gemini-3.6-flash';
     this.timeoutMs = parseInt(process.env.GEMINI_TIMEOUT_MS || '15000', 10);
   }
 
@@ -103,7 +102,6 @@ export class GeminiModelAdapter implements ModelAdapter {
         },
       ],
       generationConfig: {
-        temperature: 0.3,
         maxOutputTokens: 1024,
         responseMimeType: 'application/json',
         responseSchema: {
@@ -230,5 +228,5 @@ export class GeminiModelAdapter implements ModelAdapter {
       }
       throw new Error('Gemini request failed due to network or provider error');
     }
-}
+  }
 }

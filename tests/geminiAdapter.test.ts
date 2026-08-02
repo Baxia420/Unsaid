@@ -50,7 +50,7 @@ describe('GeminiModelAdapter', () => {
     });
   }
 
-  it('uses configured base URL, model, x-goog-api-key auth, native body shape, and structured output config', async () => {
+  it('uses configured base URL, model, x-goog-api-key auth, native body shape, and structured output config without temperature', async () => {
     mockNativeSuccessResponse({
       characterText: 'OK',
       assessment: { intent: 'repair', engagementDelta: 1, tensionDelta: -1 },
@@ -72,11 +72,25 @@ describe('GeminiModelAdapter', () => {
     expect(body.contents?.[0]?.role).toBe('user');
     expect(body.contents?.[0]?.parts?.[0]?.text).toContain('I am really sorry');
     expect(body.generationConfig).toMatchObject({
-      temperature: 0.3,
       maxOutputTokens: 1024,
       responseMimeType: 'application/json',
     });
+    expect(body.generationConfig.temperature).toBeUndefined();
     expect(body.generationConfig.responseSchema).toBeDefined();
+  });
+
+  it('uses default model gemini-3.6-flash when GEMINI_MODEL is not set', async () => {
+    delete process.env.GEMINI_MODEL;
+    const defaultAdapter = new GeminiModelAdapter();
+    mockNativeSuccessResponse({
+      characterText: 'OK',
+      assessment: { intent: 'repair', engagementDelta: 1, tensionDelta: -1 },
+    });
+
+    await defaultAdapter.generateTurn(baseRequest);
+
+    const url = vi.mocked(fetch).mock.calls[0][0] as string;
+    expect(url).toBe('https://test.example.com/v1beta/models/gemini-3.6-flash:generateContent');
   });
 
   it('handles model ID that already includes models/ prefix correctly', async () => {
