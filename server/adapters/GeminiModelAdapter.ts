@@ -2,21 +2,53 @@ import { ModelAdapter } from './ModelAdapter';
 import { TurnRequest } from '../../src/game/types';
 import { buildLivePrompt } from '../turn/prompt';
 
-interface ChatCompletionRequest {
-  model: string;
-  messages: Array<{ role: 'system' | 'user'; content: string }>;
-  temperature: number;
-  max_tokens: number;
-  stream: false;
-  response_format: { type: 'json_object' };
+interface GeminiGenerateContentRequest {
+  systemInstruction?: {
+    parts: Array<{ text: string }>;
+  };
+  contents: Array<{
+    role: 'user';
+    parts: Array<{ text: string }>;
+  }>;
+  generationConfig: {
+    temperature: number;
+    maxOutputTokens: number;
+    responseMimeType: 'application/json';
+    responseSchema: {
+      type: 'OBJECT';
+      properties: {
+        characterText: { type: 'STRING' };
+        assessment: {
+          type: 'OBJECT';
+          properties: {
+            intent: {
+              type: 'STRING';
+              enum: string[];
+            };
+            engagementDelta: { type: 'INTEGER' };
+            tensionDelta: { type: 'INTEGER' };
+          };
+          required: string[];
+        };
+      };
+      required: string[];
+    };
+  };
 }
 
-interface ChatCompletionResponse {
-  choices?: Array<{
-    message?: {
-      content?: string | null;
+interface GeminiGenerateContentResponse {
+  candidates?: Array<{
+    content?: {
+      parts?: Array<{
+        text?: string;
+      }>;
     };
   }>;
+  error?: {
+    code?: number;
+    message?: string;
+    status?: string;
+  };
 }
 
 class GeminiHttpError extends Error {
@@ -52,7 +84,7 @@ export class GeminiModelAdapter implements ModelAdapter {
   constructor() {
     this.baseUrl =
       process.env.GEMINI_BASE_URL ||
-      'https://generativelanguage.googleapis.com/v1beta/openai';
+      'https://generativelanguage.googleapis.com/v1beta';
     this.apiKey = process.env.GEMINI_API_KEY || '';
     this.model = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
     this.timeoutMs = parseInt(process.env.GEMINI_TIMEOUT_MS || '15000', 10);
@@ -60,16 +92,48 @@ export class GeminiModelAdapter implements ModelAdapter {
 
   async generateTurn(request: TurnRequest): Promise<unknown> {
     const prompt = buildLivePrompt(request);
-    const body: ChatCompletionRequest = {
-      model: this.model,
-      messages: [
-        { role: 'system', content: prompt.system },
-        { role: 'user', content: prompt.user },
+    const body: GeminiGenerateContentRequest = {
+      systemInstruction: {
+        parts: [{ text: prompt.system }],
+      },
+      contents: [
+        {
+          role: 'user',
+          parts: [{ text: prompt.user }],
+        },
       ],
-      temperature: 0.3,
-      max_tokens: 1024,
-      stream: false,
-      response_format: { type: 'json_object' },
+      generationConfig: {
+        temperature: 0.3,
+        maxOutputTokens: 1024,
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: 'OBJECT',
+          properties: {
+            characterText: { type: 'STRING' },
+            assessment: {
+              type: 'OBJECT',
+              properties: {
+                intent: {
+                  type: 'STRING',
+                  enum: [
+                    'acknowledge',
+                    'defend',
+                    'minimize',
+                    'redirect',
+                    'repair',
+                    'pressure',
+                    'unclear',
+                  ],
+                },
+                engagementDelta: { type: 'INTEGER' },
+                tensionDelta: { type: 'INTEGER' },
+              },
+              required: ['intent', 'engagementDelta', 'tensionDelta'],
+            },
+          },
+          required: ['characterText', 'assessment'],
+        },
+      },
     };
 
     let lastError: Error | undefined;
@@ -93,16 +157,22 @@ export class GeminiModelAdapter implements ModelAdapter {
     throw lastError || new Error('Gemini request failed');
   }
 
-  private async fetchOnce(body: ChatCompletionRequest): Promise<unknown> {
+  private async fetchOnce(body: GeminiGenerateContentRequest): Promise<unknown> {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), this.timeoutMs);
 
+    const cleanBaseUrl = this.baseUrl.replace(/\/+$/, '');
+    const modelPath = this.model.startsWith('models/')
+      ? this.model
+      : `models/${this.model}`;
+    const url = `${cleanBaseUrl}/${modelPath}:generateContent`;
+
     try {
-      const response = await fetch(`${this.baseUrl}/chat/completions`, {
+      const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${this.apiKey}`,
+          'x-goog-api-key': this.apiKey,
         },
         body: JSON.stringify(body),
         signal: controller.signal,
@@ -111,14 +181,34 @@ export class GeminiModelAdapter implements ModelAdapter {
       clearTimeout(timeoutId);
 
       if (!response.ok) {
-        throw new GeminiHttpError(
-          response.status,
-          `Gemini returned HTTP ${response.status}`
-        );
+        let errorDetail = '';
+        try {
+          const errorJson = (await response.json()) as GeminiGenerateContentResponse;
+          if (errorJson?.error) {
+            const { code, status, message } = errorJson.error;
+            const parts = [
+              code ? `code: ${code}` : null,
+              status ? `status: ${status}` : null,
+              message ? `message: ${message}` : null,
+            ].filter(Boolean);
+            if (parts.length > 0) {
+              errorDetail = ` — ${parts.join(', ')}`;
+            }
+          }
+        } catch {
+          // Ignore JSON parse error on non-ok body
+        }
+
+        let errorMessage = `Gemini returned HTTP ${response.status}${errorDetail}`;
+        if (this.apiKey) {
+          errorMessage = errorMessage.split(this.apiKey).join('[REDACTED]');
+        }
+
+        throw new GeminiHttpError(response.status, errorMessage);
       }
 
-      const data = (await response.json()) as ChatCompletionResponse;
-      const content = data.choices?.[0]?.message?.content;
+      const data = (await response.json()) as GeminiGenerateContentResponse;
+      const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
 
       if (!content || content.trim() === '') {
         throw new Error('Gemini response contained empty content');
@@ -140,5 +230,5 @@ export class GeminiModelAdapter implements ModelAdapter {
       }
       throw new Error('Gemini request failed due to network or provider error');
     }
-  }
+}
 }

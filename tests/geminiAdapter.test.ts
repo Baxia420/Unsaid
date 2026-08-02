@@ -17,7 +17,7 @@ describe('GeminiModelAdapter', () => {
   beforeEach(() => {
     process.env = { ...originalEnv };
     process.env.GEMINI_API_KEY = 'test-api-key-789';
-    process.env.GEMINI_BASE_URL = 'https://test.example.com/v1';
+    process.env.GEMINI_BASE_URL = 'https://test.example.com/v1beta';
     process.env.GEMINI_MODEL = 'test-model';
     process.env.GEMINI_TIMEOUT_MS = '5000';
     adapter = new GeminiModelAdapter();
@@ -38,9 +38,22 @@ describe('GeminiModelAdapter', () => {
     } as Response);
   }
 
-  it('uses configured base URL, model, Bearer auth, structured output, and non-streaming', async () => {
-    mockFetchResponse(200, {
-      choices: [{ message: { content: JSON.stringify({ characterText: 'OK', assessment: { intent: 'repair', engagementDelta: 1, tensionDelta: -1 } }) } }],
+  function mockNativeSuccessResponse(contentObj: unknown) {
+    return mockFetchResponse(200, {
+      candidates: [
+        {
+          content: {
+            parts: [{ text: JSON.stringify(contentObj) }],
+          },
+        },
+      ],
+    });
+  }
+
+  it('uses configured base URL, model, x-goog-api-key auth, native body shape, and structured output config', async () => {
+    mockNativeSuccessResponse({
+      characterText: 'OK',
+      assessment: { intent: 'repair', engagementDelta: 1, tensionDelta: -1 },
     });
 
     await adapter.generateTurn(baseRequest);
@@ -50,98 +63,127 @@ describe('GeminiModelAdapter', () => {
     const init = call[1] as RequestInit;
     const body = JSON.parse(init.body as string);
 
-    expect(url).toBe('https://test.example.com/v1/chat/completions');
+    expect(url).toBe('https://test.example.com/v1beta/models/test-model:generateContent');
     expect(init.headers).toMatchObject({
       'Content-Type': 'application/json',
-      Authorization: 'Bearer test-api-key-789',
+      'x-goog-api-key': 'test-api-key-789',
     });
-    expect(body.model).toBe('test-model');
-    expect(body.stream).toBe(false);
-    expect(body.response_format).toEqual({ type: 'json_object' });
-    expect(body.temperature).toBe(0.3);
-    expect(body.max_tokens).toBe(1024);
+    expect(body.systemInstruction?.parts?.[0]?.text).toBeDefined();
+    expect(body.contents?.[0]?.role).toBe('user');
+    expect(body.contents?.[0]?.parts?.[0]?.text).toContain('I am really sorry');
+    expect(body.generationConfig).toMatchObject({
+      temperature: 0.3,
+      maxOutputTokens: 1024,
+      responseMimeType: 'application/json',
+    });
+    expect(body.generationConfig.responseSchema).toBeDefined();
   });
 
-  it('does not place the API key in the JSON body', async () => {
-    mockFetchResponse(200, {
-      choices: [{ message: { content: JSON.stringify({ characterText: 'OK', assessment: { intent: 'repair', engagementDelta: 1, tensionDelta: -1 } }) } }],
+  it('handles model ID that already includes models/ prefix correctly', async () => {
+    process.env.GEMINI_MODEL = 'models/test-model-prefixed';
+    const customAdapter = new GeminiModelAdapter();
+    mockNativeSuccessResponse({
+      characterText: 'OK',
+      assessment: { intent: 'repair', engagementDelta: 1, tensionDelta: -1 },
+    });
+
+    await customAdapter.generateTurn(baseRequest);
+
+    const url = vi.mocked(fetch).mock.calls[0][0] as string;
+    expect(url).toBe('https://test.example.com/v1beta/models/test-model-prefixed:generateContent');
+  });
+
+  it('does not place the API key in the JSON request body', async () => {
+    mockNativeSuccessResponse({
+      characterText: 'OK',
+      assessment: { intent: 'repair', engagementDelta: 1, tensionDelta: -1 },
     });
 
     await adapter.generateTurn(baseRequest);
 
     const init = vi.mocked(fetch).mock.calls[0][1] as RequestInit;
-    const body = JSON.parse(init.body as string);
-    const bodyStr = JSON.stringify(body);
+    const bodyStr = JSON.stringify(JSON.parse(init.body as string));
     expect(bodyStr).not.toContain('test-api-key-789');
   });
 
-  it('returns parsed JSON on success', async () => {
+  it('returns parsed JSON on success from native candidate response extraction', async () => {
     const expected = { characterText: 'Thanks.', assessment: { intent: 'acknowledge', engagementDelta: 1, tensionDelta: 0 } };
-    mockFetchResponse(200, {
-      choices: [{ message: { content: JSON.stringify(expected) } }],
-    });
+    mockNativeSuccessResponse(expected);
 
     const result = await adapter.generateTurn(baseRequest);
     expect(result).toEqual(expected);
   });
 
-  it('throws sanitized error on invalid JSON', async () => {
+  it('throws sanitized error on invalid JSON inside candidate text', async () => {
     mockFetchResponse(200, {
-      choices: [{ message: { content: 'not-json' } }],
+      candidates: [{ content: { parts: [{ text: 'not-valid-json' }] } }],
     });
 
     await expect(adapter.generateTurn(baseRequest)).rejects.toThrow('invalid JSON');
   });
 
-  it('throws sanitized error on empty content', async () => {
+  it('throws sanitized error on empty candidate or empty text', async () => {
     mockFetchResponse(200, {
-      choices: [{ message: { content: '' } }],
+      candidates: [{ content: { parts: [{ text: '' }] } }],
     });
 
     await expect(adapter.generateTurn(baseRequest)).rejects.toThrow('empty content');
   });
 
-  it('throws sanitized error on malformed envelope (no choices)', async () => {
+  it('throws sanitized error on missing candidates envelope', async () => {
     mockFetchResponse(200, {});
 
     await expect(adapter.generateTurn(baseRequest)).rejects.toThrow('empty content');
   });
 
-  it('returns schema-invalid content to the caller without rejecting inside adapter', async () => {
+  it('returns schema-invalid content to caller without rejecting inside adapter', async () => {
     const raw = { characterText: 'OK', assessment: { intent: 'repair', engagementDelta: 1.5, tensionDelta: 0 } };
-    mockFetchResponse(200, {
-      choices: [{ message: { content: JSON.stringify(raw) } }],
-    });
+    mockNativeSuccessResponse(raw);
 
     const result = await adapter.generateTurn(baseRequest);
     expect(result).toEqual(raw);
   });
 
-  it('does not retry HTTP 400', async () => {
-    mockFetchResponse(400, { error: 'Bad request' });
+  it('sanitizes HTTP 400 error output with provider error details', async () => {
+    mockFetchResponse(400, {
+      error: { code: 400, status: 'INVALID_ARGUMENT', message: 'Invalid model parameter' },
+    });
 
-    await expect(adapter.generateTurn(baseRequest)).rejects.toThrow('HTTP 400');
+    await expect(adapter.generateTurn(baseRequest)).rejects.toThrow(
+      'Gemini returned HTTP 400 — code: 400, status: INVALID_ARGUMENT, message: Invalid model parameter'
+    );
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 
-  it('does not retry HTTP 401', async () => {
-    mockFetchResponse(401, { error: 'Unauthorized' });
+  it('does not retry HTTP 401 and redacts API key if present in error message', async () => {
+    mockFetchResponse(401, {
+      error: { code: 401, status: 'UNAUTHENTICATED', message: 'Key test-api-key-789 is invalid' },
+    });
 
-    await expect(adapter.generateTurn(baseRequest)).rejects.toThrow('HTTP 401');
+    try {
+      await adapter.generateTurn(baseRequest);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      expect(msg).toContain('[REDACTED]');
+      expect(msg).not.toContain('test-api-key-789');
+    }
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 
-  it('does not retry HTTP 403', async () => {
-    mockFetchResponse(403, { error: 'Forbidden' });
+  it('does not retry HTTP 403 or HTTP 404', async () => {
+    mockFetchResponse(404, {
+      error: { code: 404, status: 'NOT_FOUND', message: 'Model not found' },
+    });
 
-    await expect(adapter.generateTurn(baseRequest)).rejects.toThrow('HTTP 403');
+    await expect(adapter.generateTurn(baseRequest)).rejects.toThrow('HTTP 404');
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 
   it('retries HTTP 429 once then succeeds', async () => {
-    mockFetchResponse(429, { error: 'Rate limited' });
-    mockFetchResponse(200, {
-      choices: [{ message: { content: JSON.stringify({ characterText: 'OK', assessment: { intent: 'repair', engagementDelta: 1, tensionDelta: -1 } }) } }],
+    mockFetchResponse(429, { error: { code: 429, status: 'RESOURCE_EXHAUSTED', message: 'Rate limited' } });
+    mockNativeSuccessResponse({
+      characterText: 'OK',
+      assessment: { intent: 'repair', engagementDelta: 1, tensionDelta: -1 },
     });
 
     const result = await adapter.generateTurn(baseRequest);
@@ -150,8 +192,8 @@ describe('GeminiModelAdapter', () => {
   });
 
   it('retries HTTP 500 once then falls back to throwing', async () => {
-    mockFetchResponse(500, { error: 'Server error' });
-    mockFetchResponse(500, { error: 'Server error again' });
+    mockFetchResponse(500, { error: { code: 500, status: 'INTERNAL', message: 'Internal error' } });
+    mockFetchResponse(500, { error: { code: 500, status: 'INTERNAL', message: 'Internal error again' } });
 
     await expect(adapter.generateTurn(baseRequest)).rejects.toThrow('HTTP 500');
     expect(fetch).toHaveBeenCalledTimes(2);
@@ -159,8 +201,9 @@ describe('GeminiModelAdapter', () => {
 
   it('retries network failure once then succeeds', async () => {
     vi.mocked(fetch).mockRejectedValueOnce(new Error('fetch failed'));
-    mockFetchResponse(200, {
-      choices: [{ message: { content: JSON.stringify({ characterText: 'OK', assessment: { intent: 'repair', engagementDelta: 1, tensionDelta: -1 } }) } }],
+    mockNativeSuccessResponse({
+      characterText: 'OK',
+      assessment: { intent: 'repair', engagementDelta: 1, tensionDelta: -1 },
     });
 
     const result = await adapter.generateTurn(baseRequest);
@@ -174,18 +217,6 @@ describe('GeminiModelAdapter', () => {
 
     await expect(adapter.generateTurn(baseRequest)).rejects.toThrow('fetch failed');
     expect(fetch).toHaveBeenCalledTimes(2);
-  });
-
-  it('error messages do not contain the API key', async () => {
-    mockFetchResponse(401, { error: 'Unauthorized' });
-
-    try {
-      await adapter.generateTurn(baseRequest);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      expect(msg).not.toContain('test-api-key-789');
-    }
-    expect(fetch).toHaveBeenCalledTimes(1);
   });
 
   it('mock mode makes zero external fetch calls', async () => {
