@@ -1,226 +1,758 @@
-.conversation-scene {
-  max-width: 640px;
-  margin: 0 auto;
-  padding: 24px;
-  font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  color: #1a1a1a;
+/* ═══════════════════════════════════════════════════════
+   UNSAID — Cinematic Conversation Shell
+   Stage 1 Milestone 4A
+   ═══════════════════════════════════════════════════════ */
+
+/* ── CUSTOM PROPERTIES ─────────────────────────────────── */
+:root {
+  --cs-font:        system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+
+  /* Reality palette */
+  --cs-bg-reality:        #0e0f12;
+  --cs-stage-vignette:    radial-gradient(ellipse 90% 75% at 50% 30%, transparent 40%, rgba(0,0,0,0.65) 100%);
+  --cs-dialogue-bg:       rgba(12, 13, 16, 0.88);
+  --cs-dialogue-border:   rgba(255, 255, 255, 0.08);
+  --cs-dialogue-text:     #f0ece4;
+
+  /* Rehearse palette — warmer shift */
+  --cs-bg-rehearse:       #100d0a;
+  --cs-rehearse-tint:     rgba(200, 120, 40, 0.12);
+  --cs-imagined-bg:       rgba(50, 35, 15, 0.90);
+  --cs-imagined-border:   rgba(200, 150, 60, 0.35);
+  --cs-imagined-text:     #e8d9b8;
+
+  /* Dock */
+  --cs-dock-bg:           rgba(8, 9, 12, 0.95);
+  --cs-dock-border:       rgba(255, 255, 255, 0.07);
+  --cs-textarea-bg:       rgba(255, 255, 255, 0.05);
+  --cs-textarea-border:   rgba(255, 255, 255, 0.14);
+  --cs-textarea-text:     #e8e4dc;
+  --cs-textarea-focus:    rgba(255, 255, 255, 0.28);
+
+  /* Primary action */
+  --cs-btn-bg:            #e2d0a8;
+  --cs-btn-text:          #0e0f12;
+  --cs-btn-hover:         #f0e2bc;
+  --cs-btn-disabled:      rgba(226, 208, 168, 0.28);
+  --cs-btn-disabled-text: rgba(14, 15, 18, 0.38);
+
+  /* Rehearse button */
+  --cs-rehearse-btn-bg:   #c87828;
+  --cs-rehearse-btn-text: #0e0f12;
+  --cs-rehearse-btn-hover:#d99040;
+
+  /* Error */
+  --cs-error-bg:          rgba(90, 20, 20, 0.90);
+  --cs-error-border:      rgba(200, 60, 60, 0.35);
+  --cs-error-text:        #f4b8b8;
+
+  /* Mode strip */
+  --cs-mode-reality-text: rgba(200, 195, 185, 0.55);
+  --cs-mode-rehearse-text:#c87828;
+
+  /* Portrait silhouette fills by state */
+  --cs-silhouette-distant:      #2a2d35;
+  --cs-silhouette-defensive:    #352823;
+  --cs-silhouette-hurt-exposed: #30262a;
+  --cs-silhouette-connected:    #1e2e28;
+
+  /* Outcome */
+  --cs-outcome-bg:        #090a0c;
+  --cs-outcome-card-bg:   rgba(20, 22, 28, 0.95);
+  --cs-outcome-border:    rgba(255, 255, 255, 0.10);
+  --cs-outcome-title:     #e8e0d2;
+  --cs-outcome-desc:      #a8a098;
+
+  /* Sizing */
+  --cs-stage-ratio:       72%;
+  --cs-dock-min:          180px;
+  --cs-dialogue-max:      640px;
+  --cs-radius:            12px;
 }
 
-.scene-header h1 {
-  margin: 0 0 4px;
-  font-size: 1.5rem;
+/* ── ROOT ──────────────────────────────────────────────── */
+.cs-root {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  background: var(--cs-bg-reality);
+  font-family: var(--cs-font);
+  color: var(--cs-dialogue-text);
+  overflow-x: hidden;
+  position: relative;
+  transition: background 0.6s ease;
 }
 
-.scene-header p {
-  margin: 0 0 16px;
-  color: #555;
+.cs-root.cs-rehearse-mode {
+  background: var(--cs-bg-rehearse);
 }
 
-.portrait-block {
+/* Rehearse warm overlay */
+.cs-root.cs-rehearse-mode::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: var(--cs-rehearse-tint);
+  pointer-events: none;
+  z-index: 0;
+  transition: opacity 0.6s ease;
+}
+
+/* ── REGION 1: SCENE STAGE ─────────────────────────────── */
+.cs-stage {
+  position: relative;
+  flex: 1 1 var(--cs-stage-ratio);
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  overflow: hidden;
+  z-index: 1;
+}
+
+/* Art canvas — the ONLY place absolute positioning is used */
+.cs-art-canvas {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+/* Background layer */
+.cs-background {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(
+      160deg,
+      #1a1510 0%,
+      #0d1018 55%,
+      #0a0c10 100%
+    );
+  /* When cafe-window-afternoon.webp is available: */
+  /* background-image: url('/assets/cafe/cafe-window-afternoon.webp'); */
+  /* background-size: cover; */
+  /* background-position: center 30%; */
+}
+
+/* Subtle window light effect — intentionally designed placeholder */
+.cs-background::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 55%;
+  height: 65%;
+  background: radial-gradient(
+    ellipse 80% 60% at 50% 0%,
+    rgba(200, 170, 100, 0.08) 0%,
+    transparent 70%
+  );
+  pointer-events: none;
+}
+
+/* Window frame lines — café architectural suggestion */
+.cs-background::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 44%;
+  height: 52%;
+  border: 1px solid rgba(200, 175, 120, 0.07);
+  border-bottom: none;
+  box-shadow:
+    inset 0 0 40px rgba(180, 150, 80, 0.04),
+    0 0 60px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+}
+
+/* Portrait frame */
+.cs-portrait-frame {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(340px, 55%);
+  height: 90%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+/* Portrait images — stacked, artwork swaps in here */
+.cs-portrait-img {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: bottom center;
+  user-select: none;
+  /* Hidden until artwork is present */
+  display: none;
+}
+
+/* When artwork files exist they will be shown;
+   hide-by-default prevents broken-image icons */
+
+/* Silhouette placeholder — styled by state, visible before artwork */
+.cs-portrait-silhouette {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 52%;
+  height: 88%;
+  border-radius: 50% 50% 0 0 / 60% 60% 0 0;
+  background: var(--cs-silhouette-distant);
+  transition: background 0.7s ease, transform 0.4s ease;
+  /* Subtle inner shadow to suggest form */
+  box-shadow:
+    inset -8px 0 24px rgba(0, 0, 0, 0.4),
+    inset 8px 0 16px rgba(255, 255, 255, 0.03);
+}
+
+.cs-portrait-silhouette[data-portrait-state="distant"] {
+  background: var(--cs-silhouette-distant);
+}
+.cs-portrait-silhouette[data-portrait-state="defensive"] {
+  background: var(--cs-silhouette-defensive);
+  transform: translateX(calc(-50% + 6px));
+}
+.cs-portrait-silhouette[data-portrait-state="hurt-exposed"] {
+  background: var(--cs-silhouette-hurt-exposed);
+  transform: translateX(calc(-50% - 4px));
+}
+.cs-portrait-silhouette[data-portrait-state="connected"] {
+  background: var(--cs-silhouette-connected);
+}
+
+/* Head suggestion — a subtly lighter oval at top */
+.cs-portrait-silhouette::before {
+  content: '';
+  position: absolute;
+  top: 4%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 44%;
+  height: 30%;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.04);
+  box-shadow: 0 0 20px rgba(200, 170, 100, 0.10);
+}
+
+/* Table foreground */
+.cs-table-foreground {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 28%;
+  background: linear-gradient(
+    to top,
+    rgba(8, 6, 4, 0.95) 0%,
+    rgba(18, 14, 10, 0.70) 50%,
+    transparent 100%
+  );
+  /* When table-foreground.webp is available: */
+  /* background-image: url('/assets/cafe/table-foreground.webp'); */
+  /* background-size: cover; */
+  /* background-position: center top; */
+}
+
+/* Vignette overlay */
+.cs-stage::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--cs-stage-vignette);
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Prior player echo — one subtle hint, not a transcript */
+.cs-prior-player-echo {
+  position: relative;
+  z-index: 2;
+  align-self: flex-end;
+  max-width: min(var(--cs-dialogue-max), 90%);
+  margin: 0 clamp(16px, 5%, 64px) 8px;
+  padding: 0;
+}
+
+.cs-prior-player-text {
+  display: inline;
+  font-size: 0.8rem;
+  font-style: italic;
+  color: rgba(220, 210, 195, 0.38);
+  line-height: 1.4;
+  letter-spacing: 0.01em;
+  /* No backing plate — intentionally ghosted */
+}
+
+/* Dialogue card */
+.cs-dialogue-card {
+  position: relative;
+  z-index: 2;
+  align-self: center;
+  width: min(var(--cs-dialogue-max), 90%);
+  margin: 0 auto 20px;
+  padding: 20px 24px;
+  background: var(--cs-dialogue-bg);
+  border: 1px solid var(--cs-dialogue-border);
+  border-radius: var(--cs-radius);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow:
+    0 4px 32px rgba(0, 0, 0, 0.5),
+    0 1px 0 rgba(255, 255, 255, 0.04) inset;
+}
+
+.cs-dialogue-text {
+  margin: 0;
+  font-size: clamp(1rem, 2vw, 1.125rem);
+  line-height: 1.65;
+  color: var(--cs-dialogue-text);
+  letter-spacing: 0.01em;
+  font-weight: 400;
+}
+
+/* ── REGION 2: INTERACTION DOCK ────────────────────────── */
+.cs-dock {
+  position: relative;
+  z-index: 2;
+  flex: 0 0 auto;
+  min-height: var(--cs-dock-min);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px clamp(16px, 5%, 56px) max(16px, env(safe-area-inset-bottom));
+  background: var(--cs-dock-bg);
+  border-top: 1px solid var(--cs-dock-border);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+/* Rehearse mode: warmer dock tint */
+.cs-rehearse-mode .cs-dock {
+  border-top-color: rgba(200, 120, 40, 0.22);
+  background: rgba(14, 10, 6, 0.96);
+}
+
+/* Mode strip */
+.cs-mode-strip {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 16px;
-  padding: 12px;
-  background: #f5f5f5;
-  border-radius: 8px;
+  min-height: 18px;
 }
 
-.portrait-placeholder {
-  width: 64px;
-  height: 64px;
-  border-radius: 8px;
-  transition: background 0.2s ease;
-}
-
-.portrait-distant {
-  background: #9ca3af;
-}
-
-.portrait-defensive {
-  background: #ef4444;
-}
-
-.portrait-hurt_exposed {
-  background: #f59e0b;
-}
-
-.portrait-connected {
-  background: #10b981;
-}
-
-.portrait-label {
-  font-size: 0.875rem;
+.cs-mode-tag {
+  font-size: 0.7rem;
   font-weight: 600;
-  color: #444;
-}
-
-.transcript {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-bottom: 16px;
-  min-height: 120px;
-}
-
-.transcript-entry {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 10px 12px;
-  border-radius: 8px;
-}
-
-.transcript-entry.player {
-  background: #e0f2fe;
-  align-self: flex-end;
-  max-width: 80%;
-}
-
-.transcript-entry.character {
-  background: #f3f4f6;
-  align-self: flex-start;
-  max-width: 80%;
-}
-
-.speaker {
-  font-size: 0.75rem;
-  font-weight: 600;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #6b7280;
 }
 
-.text {
-  font-size: 0.95rem;
+.cs-mode-tag--reality {
+  color: var(--cs-mode-reality-text);
 }
 
-.input-area {
+.cs-mode-tag--rehearse {
+  color: var(--cs-mode-rehearse-text);
+}
+
+/* Imagined response panel */
+.cs-imagined-panel {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-}
-
-.input-area textarea {
-  width: 100%;
-  padding: 10px;
-  font-size: 1rem;
-  border: 1px solid #d1d5db;
+  gap: 8px;
+  padding: 14px 16px;
+  background: var(--cs-imagined-bg);
+  border: 1px solid var(--cs-imagined-border);
+  border-left: 3px solid var(--cs-mode-rehearse-text);
   border-radius: 8px;
-  resize: vertical;
-  box-sizing: border-box;
 }
 
-.input-area textarea:disabled {
-  background: #f9fafb;
-  color: #6b7280;
-}
-
-.input-area button {
-  align-self: flex-end;
-  padding: 10px 20px;
-  font-size: 1rem;
+.cs-imagined-label {
+  font-size: 0.68rem;
   font-weight: 600;
-  color: #fff;
-  background: #2563eb;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--cs-mode-rehearse-text);
+  opacity: 0.8;
+}
+
+.cs-imagined-text {
+  margin: 0;
+  padding: 0;
+  font-style: italic;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: var(--cs-imagined-text);
   border: none;
-  border-radius: 8px;
-  cursor: pointer;
 }
 
-.input-area button:disabled {
-  background: #93c5fd;
-  cursor: not-allowed;
-}
-
-.error-banner {
+/* Error panel */
+.cs-error-panel {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 10px 12px;
-  background: #fee2e2;
-  border: 1px solid #fecaca;
+  padding: 10px 14px;
+  background: var(--cs-error-bg);
+  border: 1px solid var(--cs-error-border);
   border-radius: 8px;
-  color: #991b1b;
 }
 
-.error-banner button {
-  align-self: auto;
+.cs-error-text {
+  font-size: 0.875rem;
+  color: var(--cs-error-text);
+  line-height: 1.4;
+  flex: 1;
+}
+
+.cs-retry-btn {
+  flex-shrink: 0;
   padding: 6px 14px;
-  font-size: 0.875rem;
-  background: #dc2626;
-}
-
-.outcome-panel {
-  padding: 16px;
-  background: #f0fdf4;
-  border: 1px solid #bbf7d0;
-  border-radius: 8px;
-  margin-bottom: 16px;
-}
-
-.outcome-panel h2 {
-  margin: 0 0 8px;
-  font-size: 1.25rem;
-}
-
-.outcome-panel p {
-  margin: 0 0 12px;
-}
-
-.debug-outcome {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 0.875rem;
-  color: #166534;
-}
-
-.outcome-panel button {
-  padding: 10px 20px;
-  font-size: 1rem;
+  font-size: 0.8rem;
   font-weight: 600;
-  color: #fff;
-  background: #2563eb;
+  color: var(--cs-btn-text);
+  background: #b03030;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.cs-retry-btn:hover:not(:disabled) {
+  background: #c84040;
+}
+
+.cs-retry-btn:focus-visible {
+  outline: 2px solid #f4b8b8;
+  outline-offset: 2px;
+}
+
+/* Input row */
+.cs-input-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+}
+
+/* Textarea */
+.cs-textarea {
+  flex: 1;
+  min-width: 0;
+  padding: 12px 14px;
+  font-size: 1rem;
+  font-family: var(--cs-font);
+  line-height: 1.5;
+  color: var(--cs-textarea-text);
+  background: var(--cs-textarea-bg);
+  border: 1px solid var(--cs-textarea-border);
+  border-radius: 8px;
+  resize: none;
+  box-sizing: border-box;
+  transition: border-color 0.2s ease, background 0.2s ease;
+  /* Prevent mobile zoom on focus — 1rem >= 16px */
+  font-size: max(1rem, 16px);
+}
+
+.cs-textarea::placeholder {
+  color: rgba(200, 195, 185, 0.30);
+}
+
+.cs-textarea:focus {
+  outline: none;
+  border-color: var(--cs-textarea-focus);
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.cs-textarea:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.40);
+  outline-offset: 2px;
+}
+
+.cs-textarea:disabled {
+  color: rgba(200, 195, 185, 0.25);
+  cursor: not-allowed;
+}
+
+/* SAY / Send button */
+.cs-say-btn {
+  flex-shrink: 0;
+  width: 68px;
+  min-height: 44px;
+  padding: 12px 10px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--cs-btn-text);
+  background: var(--cs-btn-bg);
   border: none;
   border-radius: 8px;
   cursor: pointer;
+  transition: background 0.2s ease, transform 0.1s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  align-self: flex-end;
 }
 
-.conversation-scene.rehearsing {
-  border-left: 4px solid #2563eb;
-  padding-left: 20px;
+.cs-rehearse-mode .cs-say-btn:not(:disabled) {
+  background: var(--cs-rehearse-btn-bg);
+  color: var(--cs-rehearse-btn-text);
 }
 
-.mode-label {
-  display: inline-block;
-  margin-top: 4px;
-  padding: 4px 12px;
-  border-radius: 4px;
-  background: #dbeafe;
-  color: #1e40af;
-  font-size: 0.75rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+.cs-say-btn:hover:not(:disabled) {
+  background: var(--cs-btn-hover);
 }
 
-.imagined-block {
-  border: 1px dashed #2563eb;
-  border-radius: 8px;
-  padding: 12px;
-  background: #eff6ff;
+.cs-rehearse-mode .cs-say-btn:hover:not(:disabled) {
+  background: var(--cs-rehearse-btn-hover);
 }
 
-.imagined-heading {
-  font-size: 0.75rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: #1e40af;
-  margin-bottom: 6px;
+.cs-say-btn:active:not(:disabled) {
+  transform: scale(0.97);
 }
 
-.imagined-text {
+.cs-say-btn:disabled {
+  background: var(--cs-btn-disabled);
+  color: var(--cs-btn-disabled-text);
+  cursor: not-allowed;
+}
+
+.cs-say-btn:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.50);
+  outline-offset: 2px;
+}
+
+/* Thinking dots */
+.cs-thinking-dots {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.cs-thinking-dots span {
+  display: block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: cs-dot-pulse 1.2s ease-in-out infinite;
+}
+
+.cs-thinking-dots span:nth-child(2) { animation-delay: 0.2s; }
+.cs-thinking-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes cs-dot-pulse {
+  0%, 80%, 100% { opacity: 0.25; transform: scale(0.85); }
+  40%            { opacity: 1;    transform: scale(1); }
+}
+
+/* ── REGION 3: OUTCOME SCENE ───────────────────────────── */
+.cs-outcome-mode {
+  background: var(--cs-outcome-bg);
+  justify-content: center;
+  align-items: center;
+  padding: 32px clamp(16px, 8%, 64px);
+}
+
+.cs-outcome-card {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  width: 100%;
+  max-width: 560px;
+  padding: 36px 40px;
+  background: var(--cs-outcome-card-bg);
+  border: 1px solid var(--cs-outcome-border);
+  border-radius: 16px;
+  box-shadow: 0 8px 48px rgba(0, 0, 0, 0.6);
+}
+
+.cs-outcome-title {
+  font-size: clamp(1.5rem, 4vw, 2rem);
+  font-weight: 300;
+  letter-spacing: 0.04em;
+  color: var(--cs-outcome-title);
+  line-height: 1.2;
+}
+
+.cs-outcome-description {
+  margin: 0;
+  font-size: clamp(0.95rem, 2vw, 1.05rem);
+  line-height: 1.7;
+  color: var(--cs-outcome-desc);
   font-style: italic;
-  color: #1e3a8a;
+}
+
+.cs-restart-btn {
+  align-self: flex-start;
+  padding: 12px 28px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--cs-btn-text);
+  background: var(--cs-btn-bg);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.1s ease;
+}
+
+.cs-restart-btn:hover {
+  background: var(--cs-btn-hover);
+}
+
+.cs-restart-btn:active {
+  transform: scale(0.97);
+}
+
+.cs-restart-btn:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.50);
+  outline-offset: 2px;
+}
+
+/* ── MOTION — PORTRAIT BREATHE ─────────────────────────── */
+@keyframes cs-breathe {
+  0%, 100% { transform: translateX(-50%) scaleY(1.000) translateY(0); }
+  50%       { transform: translateX(-50%) scaleY(1.006) translateY(-2px); }
+}
+
+.cs-portrait-silhouette {
+  animation: cs-breathe 5s ease-in-out infinite;
+  transform-origin: bottom center;
+}
+
+/* Defensive posture shift is applied inline via data attribute
+   and must override the shared animation cleanly */
+.cs-portrait-silhouette[data-portrait-state="defensive"] {
+  animation: cs-breathe-defensive 5s ease-in-out infinite;
+  transform-origin: bottom center;
+}
+
+@keyframes cs-breathe-defensive {
+  0%, 100% { transform: translateX(calc(-50% + 6px)) scaleY(1.000) translateY(0); }
+  50%       { transform: translateX(calc(-50% + 6px)) scaleY(1.006) translateY(-2px); }
+}
+
+.cs-portrait-silhouette[data-portrait-state="hurt-exposed"] {
+  animation: cs-breathe-hurt 5s ease-in-out infinite;
+  transform-origin: bottom center;
+}
+
+@keyframes cs-breathe-hurt {
+  0%, 100% { transform: translateX(calc(-50% - 4px)) scaleY(1.000) translateY(0); }
+  50%       { transform: translateX(calc(-50% - 4px)) scaleY(1.006) translateY(-2px); }
+}
+
+/* SAY snap-back: brief scale on dialogue card entering */
+@keyframes cs-card-enter {
+  0%   { opacity: 0; transform: translateY(6px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+.cs-dialogue-card {
+  animation: cs-card-enter 0.35s ease-out both;
+}
+
+/* Rehearse warm shift transition on body */
+.cs-root {
+  transition: background 0.6s ease;
+}
+
+/* ── REDUCED MOTION ────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .cs-portrait-silhouette,
+  .cs-portrait-silhouette[data-portrait-state="defensive"],
+  .cs-portrait-silhouette[data-portrait-state="hurt-exposed"] {
+    animation: none;
+  }
+
+  .cs-dialogue-card {
+    animation: none;
+  }
+
+  .cs-thinking-dots span {
+    animation: none;
+    opacity: 1;
+  }
+
+  .cs-root,
+  .cs-say-btn,
+  .cs-textarea,
+  .cs-portrait-silhouette {
+    transition: none;
+  }
+}
+
+/* ── DESKTOP — 1440 × 900 ──────────────────────────────── */
+@media (min-width: 900px) {
+  :root {
+    --cs-stage-ratio: 72%;
+    --cs-dock-min: 200px;
+  }
+
+  .cs-dialogue-card {
+    margin-bottom: 28px;
+    padding: 24px 32px;
+  }
+
+  .cs-portrait-frame {
+    width: min(380px, 40%);
+  }
+
+  .cs-dock {
+    padding: 20px clamp(32px, 8%, 96px) 24px;
+  }
+
+  .cs-say-btn {
+    width: 76px;
+  }
+}
+
+/* ── MOBILE — 390 × 844 ────────────────────────────────── */
+@media (max-width: 600px) {
+  :root {
+    --cs-stage-ratio: 58%;
+    --cs-dock-min: 200px;
+  }
+
+  .cs-dialogue-card {
+    width: 92%;
+    padding: 16px 18px;
+    margin-bottom: 12px;
+  }
+
+  .cs-dialogue-text {
+    font-size: 0.97rem;
+  }
+
+  .cs-portrait-frame {
+    width: min(220px, 65%);
+  }
+
+  .cs-dock {
+    padding: 12px 16px max(16px, env(safe-area-inset-bottom));
+    gap: 8px;
+  }
+
+  .cs-outcome-card {
+    padding: 28px 24px;
+  }
+
+  .cs-input-row {
+    gap: 8px;
+  }
+
+  .cs-say-btn {
+    width: 60px;
+    font-size: 0.82rem;
+  }
 }
