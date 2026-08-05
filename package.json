@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "concurrently \"tsx server.ts\" \"vite\"",
+    "dev": "concurrently --kill-others-on-fail --names server,client \"tsx server.ts\" \"vite --port 5173 --strictPort\"",
     "server": "tsx server.ts",
     "build": "tsc && vite build",
     "type-check": "tsc --noEmit",

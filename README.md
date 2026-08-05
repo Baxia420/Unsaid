@@ -68,16 +68,39 @@ npm run dev
 This single command starts both the **Express server** and the **Vite development server** via `concurrently`:
 
 - Express API server runs on port `3001`
-- Vite dev server runs on port `5173`
+- Vite dev server runs on port `5173` (strict — will not silently fall back to another port)
+
+If either process crashes, the other shuts down automatically (`--kill-others-on-fail`).
 
 Open the app at: **http://localhost:5173**
 
 All requests to `/api/*` from the browser are proxied to the Express server (`http://localhost:3001`).
 
+To run only the backend:
+
+```bash
+npm run server
+```
+
+The server logs `source=gemini` or `source=mock` per turn to confirm which adapter answered.
+
+### Port Conflicts
+
+Both ports use strict binding. If port 3001 or 5173 is already occupied, the dev command will fail clearly. To find and stop a stale UNSAID process:
+
+```bash
+# Windows
+netstat -ano | findstr "3001 5173"
+taskkill /PID <pid> /F
+```
+
+`.env` is git-ignored and must never be committed.
+
 ## Other Commands
 
 | Command | Description |
 |---------|-------------|
+| `npm run server` | Start Express API server only on port `3001` |
 | `npm run type-check` | Run TypeScript type checking (`tsc --noEmit`) |
 | `npm run test` | Run the full Vitest test suite |
 | `npm run build` | Production build (TypeScript compilation + Vite bundle to `dist/`) |
