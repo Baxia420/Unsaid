@@ -1,9 +1,9 @@
 /* ═══════════════════════════════════════════════════════
    UNSAID — Cinematic Conversation Shell
-   Stage 1 Milestone 4A
+   Progressive Cinematic UI
    ═══════════════════════════════════════════════════════ */
 
-/* ── GLOBAL RESET (scoped to app root) ────────────────── */
+/* ── GLOBAL RESET ──────────────────────────────────────── */
 html, body, #root {
   margin: 0;
   padding: 0;
@@ -11,75 +11,90 @@ html, body, #root {
 }
 
 html {
-  /* Prevent unintended desktop vertical scrollbar */
   overflow-y: auto;
 }
 
 /* ── CUSTOM PROPERTIES ─────────────────────────────────── */
 :root {
-  --cs-font:        system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --cs-font:            system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 
-  /* Reality palette */
-  --cs-bg-reality:        #0e0f12;
-  --cs-stage-vignette:    radial-gradient(ellipse 90% 75% at 50% 30%, transparent 40%, rgba(0,0,0,0.65) 100%);
-  --cs-dialogue-bg:       rgba(12, 13, 16, 0.88);
-  --cs-dialogue-border:   rgba(255, 255, 255, 0.08);
-  --cs-dialogue-text:     #f0ece4;
+  /* Scene */
+  --cs-bg-reality:      #0e0f12;
+  --cs-stage-vignette:  radial-gradient(ellipse 90% 75% at 50% 30%, transparent 40%, rgba(0,0,0,0.62) 100%);
+  --cs-dialogue-bg:     rgba(10, 11, 14, 0.90);
+  --cs-dialogue-border: rgba(255, 255, 255, 0.08);
+  --cs-dialogue-text:   #f0ece4;
 
-  /* Rehearse palette — warmer shift */
-  --cs-bg-rehearse:       #100d0a;
-  --cs-rehearse-tint:     rgba(200, 120, 40, 0.12);
-  --cs-imagined-bg:       rgba(50, 35, 15, 0.90);
-  --cs-imagined-border:   rgba(200, 150, 60, 0.35);
-  --cs-imagined-text:     #e8d9b8;
+  /* HUD */
+  --cs-hud-bg:          rgba(8, 9, 12, 0.82);
+  --cs-hud-border:      rgba(255, 255, 255, 0.06);
+  --cs-hud-text:        rgba(210, 205, 195, 0.80);
+  --cs-conn-bar:        #6a9fc0;
+  --cs-conn-track:      rgba(106, 159, 192, 0.22);
+  --cs-pres-bar:        #c08860;
+  --cs-pres-track:      rgba(192, 136, 96, 0.22);
 
-  /* Dock */
-  --cs-dock-bg:           rgba(8, 9, 12, 0.95);
-  --cs-dock-border:       rgba(255, 255, 255, 0.07);
-  --cs-textarea-bg:       rgba(255, 255, 255, 0.05);
-  --cs-textarea-border:   rgba(255, 255, 255, 0.14);
-  --cs-textarea-text:     #e8e4dc;
-  --cs-textarea-focus:    rgba(255, 255, 255, 0.28);
+  /* Dock / panel */
+  --cs-dock-bg:         rgba(8, 9, 12, 0.94);
+  --cs-dock-border:     rgba(255, 255, 255, 0.07);
+  --cs-panel-radius:    14px;
+
+  /* Intent buttons */
+  --cs-intent-bg:       rgba(255, 255, 255, 0.04);
+  --cs-intent-border:   rgba(255, 255, 255, 0.10);
+  --cs-intent-hover-bg: rgba(255, 255, 255, 0.08);
+  --cs-intent-hover-border: rgba(255, 255, 255, 0.20);
+  --cs-intent-sel-bg:   rgba(226, 208, 168, 0.12);
+  --cs-intent-sel-border: rgba(226, 208, 168, 0.40);
+  --cs-intent-icon:     rgba(210, 200, 185, 0.70);
+  --cs-intent-label:    #e0d8cc;
+  --cs-intent-desc:     rgba(200, 192, 180, 0.60);
+
+  /* Textarea */
+  --cs-textarea-bg:     rgba(255, 255, 255, 0.05);
+  --cs-textarea-border: rgba(255, 255, 255, 0.13);
+  --cs-textarea-text:   #e8e4dc;
+  --cs-textarea-focus:  rgba(255, 255, 255, 0.26);
 
   /* Primary action */
-  --cs-btn-bg:            #e2d0a8;
-  --cs-btn-text:          #0e0f12;
-  --cs-btn-hover:         #f0e2bc;
-  --cs-btn-disabled:      rgba(226, 208, 168, 0.28);
-  --cs-btn-disabled-text: rgba(14, 15, 18, 0.38);
+  --cs-btn-bg:          #e2d0a8;
+  --cs-btn-text:        #0e0f12;
+  --cs-btn-hover:       #f0e2bc;
+  --cs-btn-disabled:    rgba(226, 208, 168, 0.26);
+  --cs-btn-disabled-text: rgba(14, 15, 18, 0.36);
 
-  /* Rehearse button */
-  --cs-rehearse-btn-bg:   #c87828;
-  --cs-rehearse-btn-text: #0e0f12;
-  --cs-rehearse-btn-hover:#d99040;
+  /* Ghost button */
+  --cs-ghost-text:      rgba(210, 205, 195, 0.70);
+  --cs-ghost-hover:     rgba(255, 255, 255, 0.85);
 
   /* Error */
-  --cs-error-bg:          rgba(90, 20, 20, 0.90);
-  --cs-error-border:      rgba(200, 60, 60, 0.35);
-  --cs-error-text:        #f4b8b8;
+  --cs-error-bg:        rgba(80, 18, 18, 0.92);
+  --cs-error-border:    rgba(180, 50, 50, 0.35);
+  --cs-error-text:      #f4b8b8;
 
-  /* Mode strip */
-  --cs-mode-reality-text: rgba(200, 195, 185, 0.55);
-  --cs-mode-rehearse-text:#c87828;
+  /* Impact reveal */
+  --cs-aligned-accent:  rgba(100, 175, 130, 0.90);
+  --cs-construct-accent: rgba(160, 140, 90, 0.90);
+  --cs-harmful-accent:  rgba(175, 80, 80, 0.90);
 
-  /* Portrait silhouette fills by state */
+  /* Portrait silhouette fills */
   --cs-silhouette-distant:      #2a2d35;
   --cs-silhouette-defensive:    #352823;
   --cs-silhouette-hurt-exposed: #30262a;
   --cs-silhouette-connected:    #1e2e28;
 
   /* Outcome */
-  --cs-outcome-bg:        #090a0c;
-  --cs-outcome-card-bg:   rgba(20, 22, 28, 0.95);
-  --cs-outcome-border:    rgba(255, 255, 255, 0.10);
-  --cs-outcome-title:     #e8e0d2;
-  --cs-outcome-desc:      #a8a098;
+  --cs-outcome-bg:      #090a0c;
+  --cs-outcome-card-bg: rgba(20, 22, 28, 0.96);
+  --cs-outcome-border:  rgba(255, 255, 255, 0.10);
+  --cs-outcome-title:   #e8e0d2;
+  --cs-outcome-desc:    #a8a098;
 
   /* Sizing */
-  --cs-stage-ratio:       72%;
-  --cs-dock-min:          180px;
-  --cs-dialogue-max:      640px;
-  --cs-radius:            12px;
+  --cs-stage-ratio:     72%;
+  --cs-dock-min:        180px;
+  --cs-dialogue-max:    640px;
+  --cs-radius:          12px;
 }
 
 /* ── ROOT ──────────────────────────────────────────────── */
@@ -93,25 +108,415 @@ html {
   color: var(--cs-dialogue-text);
   overflow-x: hidden;
   position: relative;
-  transition: background 0.6s ease;
 }
 
-.cs-root.cs-rehearse-mode {
-  background: var(--cs-bg-rehearse);
+/* ═══════════════════════════════════════════════════════
+   TITLE SCREEN
+   ═══════════════════════════════════════════════════════ */
+.cs-title-screen {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100dvh;
+  overflow: hidden;
 }
 
-/* Rehearse warm overlay */
-.cs-root.cs-rehearse-mode::before {
+.cs-title-bg {
+  position: absolute;
+  inset: 0;
+  background:
+    url('/assets/cafe/cafe-window-afternoon.webp'),
+    linear-gradient(160deg, #1a1510 0%, #0d1018 55%, #0a0c10 100%);
+  background-size: cover, cover;
+  background-position: center 30%, center;
+  z-index: 0;
+}
+
+.cs-title-bg::after {
   content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(6, 7, 10, 0.70);
+  z-index: 1;
+}
+
+.cs-title-content {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 40px 24px;
+  text-align: center;
+  animation: cs-fade-up 0.7s ease-out both;
+}
+
+.cs-title-wordmark {
+  font-size: clamp(3rem, 9vw, 5.5rem);
+  font-weight: 200;
+  letter-spacing: 0.25em;
+  color: #f0ece4;
+  line-height: 1;
+  text-transform: uppercase;
+  margin: 0 0 4px;
+}
+
+.cs-title-tagline {
+  font-size: clamp(0.9rem, 2vw, 1.1rem);
+  color: rgba(210, 200, 185, 0.60);
+  font-style: italic;
+  font-weight: 300;
+  letter-spacing: 0.06em;
+  margin: 0 0 40px;
+  max-width: 440px;
+}
+
+.cs-title-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  max-width: 240px;
+}
+
+.cs-title-btn-primary {
+  width: 100%;
+  padding: 14px 32px;
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--cs-btn-text);
+  background: var(--cs-btn-bg);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.1s ease;
+  font-family: var(--cs-font);
+}
+
+.cs-title-btn-primary:hover {
+  background: var(--cs-btn-hover);
+}
+
+.cs-title-btn-primary:active {
+  transform: scale(0.98);
+}
+
+.cs-title-btn-primary:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.55);
+  outline-offset: 3px;
+}
+
+.cs-title-btn-ghost {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: var(--cs-ghost-text);
+  padding: 10px 20px;
+  font-size: 0.875rem;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s;
+  font-family: var(--cs-font);
+  width: 100%;
+}
+
+.cs-title-btn-ghost:hover {
+  border-color: rgba(255, 255, 255, 0.32);
+  color: var(--cs-ghost-hover);
+}
+
+.cs-title-btn-ghost:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.45);
+  outline-offset: 3px;
+}
+
+/* ═══════════════════════════════════════════════════════
+   CREDITS MODAL
+   ═══════════════════════════════════════════════════════ */
+.cs-modal-backdrop {
   position: fixed;
   inset: 0;
-  background: var(--cs-rehearse-tint);
-  pointer-events: none;
-  z-index: 0;
-  transition: opacity 0.6s ease;
+  background: rgba(4, 5, 8, 0.78);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  animation: cs-fade-in 0.25s ease both;
 }
 
-/* ── REGION 1: SCENE STAGE ─────────────────────────────── */
+.cs-modal {
+  background: rgba(16, 18, 24, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: 16px;
+  padding: 36px 40px;
+  max-width: 480px;
+  width: 100%;
+  max-height: 85dvh;
+  overflow-y: auto;
+  box-shadow: 0 16px 64px rgba(0, 0, 0, 0.7);
+  animation: cs-slide-up 0.3s ease both;
+}
+
+.cs-modal h2 {
+  margin: 0 0 20px;
+  font-size: 1.4rem;
+  font-weight: 300;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #f0ece4;
+}
+
+.cs-modal p,
+.cs-modal li {
+  font-size: 0.92rem;
+  line-height: 1.7;
+  color: rgba(210, 200, 185, 0.75);
+  margin: 0 0 8px;
+}
+
+.cs-modal-close {
+  margin-top: 24px;
+  padding: 10px 24px;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: var(--cs-ghost-text);
+  border-radius: 7px;
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-family: var(--cs-font);
+  transition: border-color 0.2s, color 0.2s;
+}
+
+.cs-modal-close:hover {
+  border-color: rgba(255, 255, 255, 0.32);
+  color: var(--cs-ghost-hover);
+}
+
+.cs-modal-close:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.45);
+  outline-offset: 3px;
+}
+
+/* ═══════════════════════════════════════════════════════
+   PROLOGUE SCREEN
+   ═══════════════════════════════════════════════════════ */
+.cs-prologue-screen {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100dvh;
+  overflow: hidden;
+}
+
+.cs-prologue-bg {
+  position: absolute;
+  inset: 0;
+  background:
+    url('/assets/cafe/cafe-window-afternoon.webp'),
+    linear-gradient(160deg, #1a1510 0%, #0d1018 55%, #0a0c10 100%);
+  background-size: cover, cover;
+  background-position: center 30%, center;
+  z-index: 0;
+}
+
+.cs-prologue-bg::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(4, 5, 8, 0.80);
+  z-index: 1;
+}
+
+.cs-prologue-content {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 48px clamp(24px, 8%, 80px);
+  max-width: 660px;
+  width: 100%;
+  animation: cs-fade-up 0.6s ease-out both;
+}
+
+.cs-prologue-eyebrow {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(210, 200, 185, 0.40);
+  margin: 0 0 20px;
+}
+
+.cs-prologue-title {
+  font-size: clamp(1.6rem, 4vw, 2.2rem);
+  font-weight: 200;
+  letter-spacing: 0.10em;
+  color: #f0ece4;
+  margin: 0 0 28px;
+  text-transform: uppercase;
+}
+
+.cs-prologue-paragraphs {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 40px;
+}
+
+.cs-prologue-para {
+  font-size: clamp(0.97rem, 2vw, 1.05rem);
+  line-height: 1.75;
+  color: rgba(220, 212, 200, 0.82);
+  margin: 0;
+  animation: cs-fade-in 0.5s ease both;
+}
+
+.cs-prologue-para:nth-child(2) { animation-delay: 0.08s; }
+.cs-prologue-para:nth-child(3) { animation-delay: 0.16s; }
+.cs-prologue-para:nth-child(4) { animation-delay: 0.24s; }
+
+.cs-prologue-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* ═══════════════════════════════════════════════════════
+   GAMEPLAY — TOP HUD
+   ═══════════════════════════════════════════════════════ */
+.cs-hud {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: 8px clamp(16px, 5%, 48px);
+  background: var(--cs-hud-bg);
+  border-bottom: 1px solid var(--cs-hud-border);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  min-height: 44px;
+  box-sizing: border-box;
+}
+
+.cs-hud-turn {
+  font-size: 0.78rem;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  color: var(--cs-hud-text);
+  white-space: nowrap;
+  min-width: 90px;
+  flex-shrink: 0;
+}
+
+.cs-hud-stats {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex: 1;
+  justify-content: center;
+  padding: 0 16px;
+}
+
+.cs-hud-stat {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.cs-hud-stat-label {
+  font-size: 0.70rem;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: rgba(200, 195, 185, 0.55);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.cs-hud-bar-track {
+  width: clamp(60px, 10vw, 100px);
+  height: 4px;
+  border-radius: 2px;
+  background: var(--cs-conn-track);
+  overflow: hidden;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.cs-hud-bar-track--pressure {
+  background: var(--cs-pres-track);
+}
+
+.cs-hud-bar-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--cs-conn-bar);
+  transition: width 0.5s ease;
+}
+
+.cs-hud-bar-fill--pressure {
+  background: var(--cs-pres-bar);
+}
+
+.cs-hud-bar-value {
+  font-size: 0.68rem;
+  color: rgba(200, 195, 185, 0.45);
+  font-variant-numeric: tabular-nums;
+  min-width: 22px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.cs-hud-pause-btn {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: rgba(200, 195, 185, 0.65);
+  padding: 5px 12px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s;
+  font-family: var(--cs-font);
+  flex-shrink: 0;
+  min-height: 30px;
+}
+
+.cs-hud-pause-btn:hover {
+  border-color: rgba(255, 255, 255, 0.28);
+  color: rgba(210, 205, 195, 0.90);
+}
+
+.cs-hud-pause-btn:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.42);
+  outline-offset: 2px;
+}
+
+/* ═══════════════════════════════════════════════════════
+   GAMEPLAY SCENE
+   ═══════════════════════════════════════════════════════ */
 .cs-stage {
   position: relative;
   flex: 1 1 var(--cs-stage-ratio);
@@ -121,32 +526,25 @@ html {
   justify-content: flex-end;
   overflow: hidden;
   z-index: 1;
+  padding-top: 44px; /* HUD height */
 }
 
-/* Art canvas — the ONLY place absolute positioning is used */
 .cs-art-canvas {
   position: absolute;
   inset: 0;
   overflow: hidden;
 }
 
-/* Background layer — layered: real asset on top, gradient fallback below */
 .cs-background {
   position: absolute;
   inset: 0;
   background:
     url('/assets/cafe/cafe-window-afternoon.webp'),
-    linear-gradient(
-      160deg,
-      #1a1510 0%,
-      #0d1018 55%,
-      #0a0c10 100%
-    );
+    linear-gradient(160deg, #1a1510 0%, #0d1018 55%, #0a0c10 100%);
   background-size: cover, cover;
   background-position: center 30%, center 30%;
 }
 
-/* Subtle window light effect — intentionally designed placeholder */
 .cs-background::before {
   content: '';
   position: absolute;
@@ -157,13 +555,12 @@ html {
   height: 65%;
   background: radial-gradient(
     ellipse 80% 60% at 50% 0%,
-    rgba(200, 170, 100, 0.08) 0%,
+    rgba(200, 170, 100, 0.07) 0%,
     transparent 70%
   );
   pointer-events: none;
 }
 
-/* Window frame lines — café architectural suggestion */
 /* Portrait frame */
 .cs-portrait-frame {
   position: absolute;
@@ -177,7 +574,6 @@ html {
   justify-content: center;
 }
 
-/* Portrait images — stacked, artwork swaps in here */
 .cs-portrait-img {
   position: absolute;
   bottom: 0;
@@ -189,13 +585,12 @@ html {
   user-select: none;
 }
 
-/* Blink frame is hidden by default; toggled via animation or JS */
 .cs-portrait-blink {
   opacity: 0;
   pointer-events: none;
 }
 
-/* Silhouette placeholder — styled by state, visible before artwork */
+/* Silhouette */
 .cs-portrait-silhouette {
   position: absolute;
   bottom: 0;
@@ -206,10 +601,11 @@ html {
   border-radius: 50% 50% 0 0 / 60% 60% 0 0;
   background: var(--cs-silhouette-distant);
   transition: background 0.7s ease, transform 0.4s ease;
-  /* Subtle inner shadow to suggest form */
   box-shadow:
     inset -8px 0 24px rgba(0, 0, 0, 0.4),
     inset 8px 0 16px rgba(255, 255, 255, 0.03);
+  animation: cs-breathe 5s ease-in-out infinite;
+  transform-origin: bottom center;
 }
 
 .cs-portrait-silhouette--hidden {
@@ -222,17 +618,18 @@ html {
 }
 .cs-portrait-silhouette[data-portrait-state="defensive"] {
   background: var(--cs-silhouette-defensive);
-  transform: translateX(calc(-50% + 6px));
+  animation: cs-breathe-defensive 5s ease-in-out infinite;
+  transform-origin: bottom center;
 }
 .cs-portrait-silhouette[data-portrait-state="hurt-exposed"] {
   background: var(--cs-silhouette-hurt-exposed);
-  transform: translateX(calc(-50% - 4px));
+  animation: cs-breathe-hurt 5s ease-in-out infinite;
+  transform-origin: bottom center;
 }
 .cs-portrait-silhouette[data-portrait-state="connected"] {
   background: var(--cs-silhouette-connected);
 }
 
-/* Head suggestion — a subtly lighter oval at top */
 .cs-portrait-silhouette::before {
   content: '';
   position: absolute;
@@ -243,10 +640,10 @@ html {
   height: 30%;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.04);
-  box-shadow: 0 0 20px rgba(200, 170, 100, 0.10);
+  box-shadow: 0 0 20px rgba(200, 170, 100, 0.09);
 }
 
-/* Table foreground — layered: real asset on top, gradient fallback below */
+/* Table foreground gradient */
 .cs-table-foreground {
   position: absolute;
   bottom: 0;
@@ -255,13 +652,13 @@ html {
   height: 28%;
   background: linear-gradient(
     to top,
-    rgba(8, 6, 4, 0.95) 0%,
-    rgba(18, 14, 10, 0.70) 50%,
+    rgba(8, 6, 4, 0.92) 0%,
+    rgba(18, 14, 10, 0.65) 50%,
     transparent 100%
   );
 }
 
-/* Vignette overlay */
+/* Vignette */
 .cs-stage::after {
   content: '';
   position: absolute;
@@ -271,27 +668,9 @@ html {
   z-index: 1;
 }
 
-/* Prior player echo — one subtle hint, not a transcript */
-.cs-prior-player-echo {
-  position: relative;
-  z-index: 2;
-  align-self: flex-end;
-  max-width: min(var(--cs-dialogue-max), 90%);
-  margin: 0 clamp(16px, 5%, 64px) 8px;
-  padding: 0;
-}
-
-.cs-prior-player-text {
-  display: inline;
-  font-size: 0.8rem;
-  font-style: italic;
-  color: rgba(220, 210, 195, 0.38);
-  line-height: 1.4;
-  letter-spacing: 0.01em;
-  /* No backing plate — intentionally ghosted */
-}
-
-/* Dialogue card */
+/* ═══════════════════════════════════════════════════════
+   DIALOGUE BOX
+   ═══════════════════════════════════════════════════════ */
 .cs-dialogue-card {
   position: relative;
   z-index: 2;
@@ -307,26 +686,28 @@ html {
   box-shadow:
     0 4px 32px rgba(0, 0, 0, 0.5),
     0 1px 0 rgba(255, 255, 255, 0.04) inset;
+  animation: cs-card-enter 0.35s ease-out both;
 }
 
 .cs-dialogue-text {
   margin: 0;
-  font-size: clamp(1rem, 2vw, 1.125rem);
+  font-size: clamp(1rem, 2vw, 1.1rem);
   line-height: 1.65;
   color: var(--cs-dialogue-text);
   letter-spacing: 0.01em;
   font-weight: 400;
 }
 
-/* ── REGION 2: INTERACTION DOCK ────────────────────────── */
+/* ═══════════════════════════════════════════════════════
+   INTERACTION DOCK (bottom panel)
+   ═══════════════════════════════════════════════════════ */
 .cs-dock {
   position: relative;
-  z-index: 2;
+  z-index: 20;
   flex: 0 0 auto;
   min-height: var(--cs-dock-min);
   display: flex;
   flex-direction: column;
-  gap: 10px;
   padding: 16px clamp(16px, 5%, 56px) max(16px, env(safe-area-inset-bottom));
   background: var(--cs-dock-bg);
   border-top: 1px solid var(--cs-dock-border);
@@ -334,66 +715,289 @@ html {
   -webkit-backdrop-filter: blur(20px);
 }
 
-/* Rehearse mode: warmer dock tint */
-.cs-rehearse-mode .cs-dock {
-  border-top-color: rgba(200, 120, 40, 0.22);
-  background: rgba(14, 10, 6, 0.96);
+/* ── INTENT SELECTION STATE ─────────────────────────────── */
+.cs-intent-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  animation: cs-panel-enter 0.22s ease-out both;
 }
 
-/* Mode strip */
-.cs-mode-strip {
+.cs-intent-legend {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: rgba(200, 192, 180, 0.52);
+  margin: 0 0 4px;
+}
+
+.cs-intent-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.cs-intent-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 8px;
+  background: var(--cs-intent-bg);
+  border: 1px solid var(--cs-intent-border);
+  border-radius: 10px;
+  cursor: pointer;
+  transition:
+    background 0.18s ease,
+    border-color 0.18s ease,
+    transform 0.12s ease;
+  color: inherit;
+  font-family: var(--cs-font);
+  min-height: 80px;
+  text-align: center;
+}
+
+.cs-intent-btn:hover {
+  background: var(--cs-intent-hover-bg);
+  border-color: var(--cs-intent-hover-border);
+}
+
+.cs-intent-btn:active {
+  transform: scale(0.97);
+}
+
+.cs-intent-btn[aria-pressed="true"] {
+  background: var(--cs-intent-sel-bg);
+  border-color: var(--cs-intent-sel-border);
+}
+
+.cs-intent-btn:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.42);
+  outline-offset: 2px;
+}
+
+.cs-intent-icon {
+  color: var(--cs-intent-icon);
+  flex-shrink: 0;
+}
+
+.cs-intent-btn[aria-pressed="true"] .cs-intent-icon {
+  color: rgba(226, 208, 168, 0.90);
+}
+
+.cs-intent-label {
+  font-size: 0.80rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--cs-intent-label);
+  line-height: 1.1;
+}
+
+.cs-intent-desc {
+  font-size: 0.72rem;
+  color: var(--cs-intent-desc);
+  line-height: 1.3;
+}
+
+/* ── COMPOSE STATE ─────────────────────────────────────── */
+.cs-compose-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  animation: cs-panel-enter 0.22s ease-out both;
+}
+
+.cs-compose-header {
   display: flex;
   align-items: center;
-  min-height: 18px;
+  gap: 10px;
 }
 
-.cs-mode-tag {
-  font-size: 0.7rem;
+.cs-compose-back-btn {
+  background: transparent;
+  border: none;
+  color: var(--cs-ghost-text);
+  font-size: 0.80rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 0;
+  font-family: var(--cs-font);
+  transition: color 0.18s;
+  flex-shrink: 0;
+}
+
+.cs-compose-back-btn:hover {
+  color: var(--cs-ghost-hover);
+}
+
+.cs-compose-back-btn:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.40);
+  outline-offset: 2px;
+}
+
+.cs-intent-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  background: var(--cs-intent-sel-bg);
+  border: 1px solid var(--cs-intent-sel-border);
+  border-radius: 20px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(226, 208, 168, 0.85);
+}
+
+.cs-compose-input-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+}
+
+.cs-textarea {
+  flex: 1;
+  min-width: 0;
+  padding: 12px 14px;
+  font-family: var(--cs-font);
+  font-size: max(1rem, 16px);
+  line-height: 1.5;
+  color: var(--cs-textarea-text);
+  background: var(--cs-textarea-bg);
+  border: 1px solid var(--cs-textarea-border);
+  border-radius: 8px;
+  resize: none;
+  box-sizing: border-box;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.cs-textarea::placeholder {
+  color: rgba(200, 195, 185, 0.28);
+}
+
+.cs-textarea:focus {
+  outline: none;
+  border-color: var(--cs-textarea-focus);
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.cs-textarea:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.38);
+  outline-offset: 2px;
+}
+
+.cs-textarea:disabled {
+  color: rgba(200, 195, 185, 0.24);
+  cursor: not-allowed;
+}
+
+.cs-say-btn {
+  flex-shrink: 0;
+  min-width: 68px;
+  min-height: 44px;
+  padding: 10px 14px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--cs-btn-text);
+  background: var(--cs-btn-bg);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.1s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  align-self: flex-end;
+  font-family: var(--cs-font);
+}
+
+.cs-say-btn:hover:not(:disabled) {
+  background: var(--cs-btn-hover);
+}
+
+.cs-say-btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.cs-say-btn:disabled {
+  background: var(--cs-btn-disabled);
+  color: var(--cs-btn-disabled-text);
+  cursor: not-allowed;
+}
+
+.cs-say-btn:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.48);
+  outline-offset: 2px;
+}
+
+.cs-char-count {
+  font-size: 0.68rem;
+  color: rgba(200, 195, 185, 0.38);
+  text-align: right;
+  margin-top: -4px;
+}
+
+.cs-char-count--warn {
+  color: rgba(200, 140, 80, 0.75);
+}
+
+/* ── WAITING STATE ─────────────────────────────────────── */
+.cs-waiting-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  animation: cs-panel-enter 0.22s ease-out both;
+}
+
+.cs-waiting-intent {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cs-waiting-label {
+  font-size: 0.72rem;
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+  color: rgba(200, 192, 180, 0.48);
 }
 
-.cs-mode-tag--reality {
-  color: var(--cs-mode-reality-text);
-}
-
-.cs-mode-tag--rehearse {
-  color: var(--cs-mode-rehearse-text);
-}
-
-/* Imagined response panel */
-.cs-imagined-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 14px 16px;
-  background: var(--cs-imagined-bg);
-  border: 1px solid var(--cs-imagined-border);
-  border-left: 3px solid var(--cs-mode-rehearse-text);
-  border-radius: 8px;
-}
-
-.cs-imagined-label {
-  font-size: 0.68rem;
-  font-weight: 600;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-  color: var(--cs-mode-rehearse-text);
-  opacity: 0.8;
-}
-
-.cs-imagined-text {
-  margin: 0;
-  padding: 0;
+.cs-waiting-message {
+  font-size: clamp(0.92rem, 1.8vw, 1rem);
+  color: rgba(210, 202, 190, 0.72);
   font-style: italic;
-  font-size: 0.95rem;
-  line-height: 1.6;
-  color: var(--cs-imagined-text);
-  border: none;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
-/* Error panel */
+.cs-thinking-dots {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.cs-thinking-dots span {
+  display: block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: cs-dot-pulse 1.2s ease-in-out infinite;
+}
+
+.cs-thinking-dots span:nth-child(2) { animation-delay: 0.2s; }
+.cs-thinking-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+/* ── ERROR STATE ────────────────────────────────────────── */
 .cs-error-panel {
   display: flex;
   align-items: center;
@@ -418,15 +1022,17 @@ html {
   font-size: 0.8rem;
   font-weight: 600;
   color: var(--cs-btn-text);
-  background: #b03030;
+  background: #a83030;
   border: none;
   border-radius: 6px;
   cursor: pointer;
   transition: background 0.2s ease;
+  font-family: var(--cs-font);
+  min-height: 36px;
 }
 
-.cs-retry-btn:hover:not(:disabled) {
-  background: #c84040;
+.cs-retry-btn:hover {
+  background: #c04040;
 }
 
 .cs-retry-btn:focus-visible {
@@ -434,126 +1040,324 @@ html {
   outline-offset: 2px;
 }
 
-/* Input row */
-.cs-input-row {
+/* ── IMPACT REVEAL STATE ────────────────────────────────── */
+.cs-impact-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  animation: cs-panel-enter 0.25s ease-out both;
+}
+
+.cs-impact-comparison {
   display: flex;
   gap: 10px;
-  align-items: flex-end;
+  align-items: stretch;
 }
 
-/* Textarea */
-.cs-textarea {
+.cs-impact-col {
   flex: 1;
-  min-width: 0;
-  padding: 12px 14px;
-  font-size: 1rem;
-  font-family: var(--cs-font);
-  line-height: 1.5;
-  color: var(--cs-textarea-text);
-  background: var(--cs-textarea-bg);
-  border: 1px solid var(--cs-textarea-border);
+  padding: 10px 14px;
   border-radius: 8px;
-  resize: none;
-  box-sizing: border-box;
-  transition: border-color 0.2s ease, background 0.2s ease;
-  /* Prevent mobile zoom on focus — 1rem >= 16px */
-  font-size: max(1rem, 16px);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
-.cs-textarea::placeholder {
-  color: rgba(200, 195, 185, 0.30);
-}
-
-.cs-textarea:focus {
-  outline: none;
-  border-color: var(--cs-textarea-focus);
-  background: rgba(255, 255, 255, 0.07);
-}
-
-.cs-textarea:focus-visible {
-  outline: 2px solid rgba(255, 255, 255, 0.40);
-  outline-offset: 2px;
-}
-
-.cs-textarea:disabled {
-  color: rgba(200, 195, 185, 0.25);
-  cursor: not-allowed;
-}
-
-/* SAY / Send button */
-.cs-say-btn {
-  flex-shrink: 0;
-  width: 68px;
-  min-height: 44px;
-  padding: 12px 10px;
-  font-size: 0.9rem;
+.cs-impact-col-label {
+  font-size: 0.66rem;
   font-weight: 700;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: rgba(200, 192, 180, 0.50);
+}
+
+.cs-impact-col-value {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #e8e0d0;
+  text-transform: capitalize;
+}
+
+.cs-impact-divider {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  padding: 0 2px;
+}
+
+.cs-impact-divider-icon {
+  color: rgba(200, 192, 180, 0.35);
+}
+
+.cs-impact-reason {
+  font-size: clamp(0.87rem, 1.8vw, 0.95rem);
+  color: rgba(210, 202, 190, 0.72);
+  font-style: italic;
+  line-height: 1.6;
+  margin: 0;
+  padding: 10px 14px;
+  border-left: 2px solid rgba(200, 192, 180, 0.22);
+}
+
+/* alignment border treatment */
+.cs-impact-panel[data-alignment="aligned"] .cs-impact-reason {
+  border-left-color: rgba(100, 175, 130, 0.55);
+}
+
+.cs-impact-panel[data-alignment="constructive_divergence"] .cs-impact-reason {
+  border-left-color: rgba(180, 155, 90, 0.55);
+}
+
+.cs-impact-panel[data-alignment="harmful_divergence"] .cs-impact-reason {
+  border-left-color: rgba(175, 80, 80, 0.55);
+}
+
+.cs-impact-alignment-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 3px 9px;
+  border-radius: 20px;
+  align-self: flex-start;
+}
+
+.cs-impact-alignment-badge--aligned {
+  background: rgba(100, 175, 130, 0.14);
+  color: rgba(130, 200, 155, 0.90);
+  border: 1px solid rgba(100, 175, 130, 0.28);
+}
+
+.cs-impact-alignment-badge--constructive {
+  background: rgba(180, 155, 90, 0.12);
+  color: rgba(210, 185, 115, 0.90);
+  border: 1px solid rgba(180, 155, 90, 0.28);
+}
+
+.cs-impact-alignment-badge--harmful {
+  background: rgba(175, 80, 80, 0.12);
+  color: rgba(210, 120, 120, 0.90);
+  border: 1px solid rgba(175, 80, 80, 0.28);
+}
+
+.cs-impact-continue-btn {
+  align-self: flex-end;
+  padding: 9px 22px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
   color: var(--cs-btn-text);
   background: var(--cs-btn-bg);
   border: none;
   border-radius: 8px;
   cursor: pointer;
   transition: background 0.2s ease, transform 0.1s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  align-self: flex-end;
+  font-family: var(--cs-font);
+  min-height: 40px;
 }
 
-.cs-rehearse-mode .cs-say-btn:not(:disabled) {
-  background: var(--cs-rehearse-btn-bg);
-  color: var(--cs-rehearse-btn-text);
-}
-
-.cs-say-btn:hover:not(:disabled) {
+.cs-impact-continue-btn:hover {
   background: var(--cs-btn-hover);
 }
 
-.cs-rehearse-mode .cs-say-btn:hover:not(:disabled) {
-  background: var(--cs-rehearse-btn-hover);
-}
-
-.cs-say-btn:active:not(:disabled) {
+.cs-impact-continue-btn:active {
   transform: scale(0.97);
 }
 
-.cs-say-btn:disabled {
-  background: var(--cs-btn-disabled);
-  color: var(--cs-btn-disabled-text);
-  cursor: not-allowed;
-}
-
-.cs-say-btn:focus-visible {
-  outline: 2px solid rgba(255, 255, 255, 0.50);
+.cs-impact-continue-btn:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.48);
   outline-offset: 2px;
 }
 
-/* Thinking dots */
-.cs-thinking-dots {
+/* ═══════════════════════════════════════════════════════
+   PAUSE OVERLAY
+   ═══════════════════════════════════════════════════════ */
+.cs-pause-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(4, 5, 8, 0.72);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+  z-index: 100;
   display: flex;
-  gap: 4px;
   align-items: center;
+  justify-content: center;
+  padding: 24px;
+  animation: cs-fade-in 0.22s ease both;
 }
 
-.cs-thinking-dots span {
-  display: block;
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: currentColor;
-  animation: cs-dot-pulse 1.2s ease-in-out infinite;
+.cs-pause-card {
+  background: rgba(14, 16, 21, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: 16px;
+  padding: 36px 40px;
+  max-width: 380px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: 0 16px 56px rgba(0, 0, 0, 0.65);
+  animation: cs-slide-up 0.28s ease both;
 }
 
-.cs-thinking-dots span:nth-child(2) { animation-delay: 0.2s; }
-.cs-thinking-dots span:nth-child(3) { animation-delay: 0.4s; }
-
-@keyframes cs-dot-pulse {
-  0%, 80%, 100% { opacity: 0.25; transform: scale(0.85); }
-  40%            { opacity: 1;    transform: scale(1); }
+.cs-pause-title {
+  font-size: 1.2rem;
+  font-weight: 300;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #f0ece4;
+  margin: 0 0 8px;
 }
 
-/* ── REGION 3: OUTCOME SCENE ───────────────────────────── */
+.cs-pause-btn {
+  padding: 11px 20px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  border-radius: 8px;
+  cursor: pointer;
+  font-family: var(--cs-font);
+  transition: background 0.2s, border-color 0.2s, color 0.2s, transform 0.1s;
+  min-height: 44px;
+  text-align: left;
+  letter-spacing: 0.02em;
+}
+
+.cs-pause-btn--primary {
+  background: var(--cs-btn-bg);
+  color: var(--cs-btn-text);
+  border: none;
+  font-weight: 600;
+}
+
+.cs-pause-btn--primary:hover {
+  background: var(--cs-btn-hover);
+}
+
+.cs-pause-btn--ghost {
+  background: transparent;
+  color: var(--cs-ghost-text);
+  border: 1px solid rgba(255, 255, 255, 0.13);
+}
+
+.cs-pause-btn--ghost:hover {
+  border-color: rgba(255, 255, 255, 0.28);
+  color: var(--cs-ghost-hover);
+}
+
+.cs-pause-btn--danger {
+  background: transparent;
+  color: rgba(200, 130, 130, 0.80);
+  border: 1px solid rgba(180, 80, 80, 0.20);
+}
+
+.cs-pause-btn--danger:hover {
+  border-color: rgba(180, 80, 80, 0.40);
+  color: rgba(220, 140, 140, 0.90);
+}
+
+.cs-pause-btn:active {
+  transform: scale(0.98);
+}
+
+.cs-pause-btn:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.42);
+  outline-offset: 2px;
+}
+
+.cs-pause-confirm {
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  animation: cs-fade-in 0.18s ease both;
+}
+
+.cs-pause-confirm-text {
+  font-size: 0.88rem;
+  color: rgba(210, 200, 185, 0.72);
+  line-height: 1.55;
+  margin: 0;
+}
+
+.cs-pause-confirm-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.cs-pause-separator {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.07);
+  margin: 4px 0;
+}
+
+/* ═══════════════════════════════════════════════════════
+   CLOSING MODE
+   ═══════════════════════════════════════════════════════ */
+.cs-closing-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  animation: cs-panel-enter 0.3s ease-out both;
+}
+
+.cs-closing-eyebrow {
+  font-size: 0.70rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(200, 192, 180, 0.40);
+  margin: 0;
+}
+
+.cs-closing-message {
+  font-size: clamp(1rem, 2vw, 1.1rem);
+  color: rgba(230, 222, 210, 0.88);
+  line-height: 1.70;
+  margin: 0;
+  font-style: italic;
+}
+
+.cs-closing-continue-btn {
+  align-self: flex-start;
+  margin-top: 4px;
+  padding: 10px 24px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: var(--cs-btn-text);
+  background: var(--cs-btn-bg);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.1s ease;
+  font-family: var(--cs-font);
+  min-height: 42px;
+}
+
+.cs-closing-continue-btn:hover {
+  background: var(--cs-btn-hover);
+}
+
+.cs-closing-continue-btn:active {
+  transform: scale(0.97);
+}
+
+.cs-closing-continue-btn:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.48);
+  outline-offset: 2px;
+}
+
+/* ═══════════════════════════════════════════════════════
+   OUTCOME SCREEN
+   ═══════════════════════════════════════════════════════ */
 .cs-outcome-mode {
   background: var(--cs-outcome-bg);
   justify-content: center;
@@ -566,63 +1370,118 @@ html {
   flex-direction: column;
   gap: 20px;
   width: 100%;
-  max-width: 560px;
-  padding: 36px 40px;
+  max-width: 580px;
+  padding: 40px 44px;
   background: var(--cs-outcome-card-bg);
   border: 1px solid var(--cs-outcome-border);
   border-radius: 16px;
   box-shadow: 0 8px 48px rgba(0, 0, 0, 0.6);
+  animation: cs-fade-up 0.5s ease-out both;
+}
+
+.cs-outcome-eyebrow {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(210, 200, 185, 0.38);
 }
 
 .cs-outcome-title {
-  font-size: clamp(1.5rem, 4vw, 2rem);
-  font-weight: 300;
-  letter-spacing: 0.04em;
+  font-size: clamp(1.6rem, 4vw, 2.2rem);
+  font-weight: 200;
+  letter-spacing: 0.08em;
   color: var(--cs-outcome-title);
   line-height: 1.2;
+  margin: 0;
 }
 
 .cs-outcome-description {
   margin: 0;
   font-size: clamp(0.95rem, 2vw, 1.05rem);
-  line-height: 1.7;
+  line-height: 1.72;
   color: var(--cs-outcome-desc);
   font-style: italic;
 }
 
-.cs-outcome-reflection {
-  margin: 4px 0;
-  padding: 18px 20px;
-  border-left: 2px solid rgba(226, 208, 168, 0.55);
-  background: rgba(255, 255, 255, 0.025);
+.cs-outcome-stats {
+  display: flex;
+  gap: 16px;
+  padding: 14px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
 }
 
-.cs-outcome-reflection figcaption {
-  margin-bottom: 10px;
-  color: rgba(232, 224, 210, 0.52);
+.cs-outcome-stat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cs-outcome-stat-label {
   font-size: 0.68rem;
   font-weight: 700;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.09em;
   text-transform: uppercase;
+  color: rgba(200, 195, 185, 0.48);
 }
 
-.cs-outcome-reflection blockquote {
-  margin: 0 0 12px;
-  color: var(--cs-outcome-title);
-  font-size: clamp(1rem, 2.5vw, 1.2rem);
-  line-height: 1.55;
+.cs-outcome-stat-bar-track {
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
 }
 
-.cs-outcome-reflection p {
+.cs-outcome-stat-bar-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.6s ease;
+}
+
+.cs-outcome-stat-bar-fill--conn {
+  background: var(--cs-conn-bar);
+}
+
+.cs-outcome-stat-bar-fill--pres {
+  background: var(--cs-pres-bar);
+}
+
+.cs-outcome-reflection {
+  padding: 16px 18px;
+  border-left: 2px solid rgba(226, 208, 168, 0.40);
+  background: rgba(255, 255, 255, 0.025);
+  border-radius: 0 6px 6px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cs-outcome-reflection-label {
+  font-size: 0.67rem;
+  font-weight: 700;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: rgba(200, 195, 185, 0.42);
+}
+
+.cs-outcome-reflection-text {
   margin: 0;
-  color: var(--cs-outcome-desc);
   font-size: 0.9rem;
-  line-height: 1.6;
+  line-height: 1.62;
+  color: var(--cs-outcome-desc);
+}
+
+.cs-outcome-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 4px;
 }
 
 .cs-restart-btn {
-  align-self: flex-start;
-  padding: 12px 28px;
+  padding: 11px 26px;
   font-size: 0.9rem;
   font-weight: 600;
   letter-spacing: 0.04em;
@@ -632,6 +1491,8 @@ html {
   border-radius: 8px;
   cursor: pointer;
   transition: background 0.2s ease, transform 0.1s ease;
+  font-family: var(--cs-font);
+  min-height: 42px;
 }
 
 .cs-restart-btn:hover {
@@ -643,44 +1504,131 @@ html {
 }
 
 .cs-restart-btn:focus-visible {
-  outline: 2px solid rgba(255, 255, 255, 0.50);
+  outline: 2px solid rgba(255, 255, 255, 0.48);
   outline-offset: 2px;
 }
 
-/* ── MOTION — PORTRAIT BREATHE ─────────────────────────── */
-@keyframes cs-breathe {
-  0%, 100% { transform: translateX(-50%) scaleY(1.000) translateY(0); }
-  50%       { transform: translateX(-50%) scaleY(1.006) translateY(-2px); }
+/* ═══════════════════════════════════════════════════════
+   TUTORIAL OVERLAY
+   ═══════════════════════════════════════════════════════ */
+.cs-tutorial-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  pointer-events: none;
 }
 
-.cs-portrait-silhouette {
-  animation: cs-breathe 5s ease-in-out infinite;
-  transform-origin: bottom center;
+.cs-tutorial-spotlight {
+  position: absolute;
+  inset: 0;
+  background: rgba(4, 5, 8, 0.55);
+  pointer-events: all;
 }
 
-/* Defensive posture shift is applied inline via data attribute
-   and must override the shared animation cleanly */
-.cs-portrait-silhouette[data-portrait-state="defensive"] {
-  animation: cs-breathe-defensive 5s ease-in-out infinite;
-  transform-origin: bottom center;
+.cs-tutorial-tooltip {
+  position: absolute;
+  bottom: calc(var(--cs-dock-min) + 16px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(16, 18, 24, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  padding: 18px 22px;
+  max-width: 340px;
+  width: calc(100% - 48px);
+  pointer-events: all;
+  animation: cs-slide-up 0.28s ease both;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.55);
 }
 
-@keyframes cs-breathe-defensive {
-  0%, 100% { transform: translateX(calc(-50% + 6px)) scaleY(1.000) translateY(0); }
-  50%       { transform: translateX(calc(-50% + 6px)) scaleY(1.006) translateY(-2px); }
+.cs-tutorial-step {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: rgba(200, 190, 175, 0.45);
+  margin-bottom: 8px;
 }
 
-.cs-portrait-silhouette[data-portrait-state="hurt-exposed"] {
-  animation: cs-breathe-hurt 5s ease-in-out infinite;
-  transform-origin: bottom center;
+.cs-tutorial-text {
+  font-size: 0.92rem;
+  line-height: 1.60;
+  color: rgba(220, 212, 200, 0.88);
+  margin: 0 0 16px;
 }
 
-@keyframes cs-breathe-hurt {
-  0%, 100% { transform: translateX(calc(-50% - 4px)) scaleY(1.000) translateY(0); }
-  50%       { transform: translateX(calc(-50% - 4px)) scaleY(1.006) translateY(-2px); }
+.cs-tutorial-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
 }
 
-/* SAY snap-back: brief scale on dialogue card entering */
+.cs-tutorial-skip-btn {
+  background: transparent;
+  border: none;
+  color: rgba(200, 190, 175, 0.50);
+  font-size: 0.80rem;
+  cursor: pointer;
+  font-family: var(--cs-font);
+  padding: 4px 8px;
+  transition: color 0.18s;
+}
+
+.cs-tutorial-skip-btn:hover {
+  color: rgba(200, 190, 175, 0.80);
+}
+
+.cs-tutorial-skip-btn:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.35);
+  outline-offset: 2px;
+}
+
+.cs-tutorial-next-btn {
+  background: var(--cs-btn-bg);
+  color: var(--cs-btn-text);
+  border: none;
+  border-radius: 7px;
+  padding: 7px 18px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: var(--cs-font);
+  transition: background 0.18s;
+  min-height: 34px;
+}
+
+.cs-tutorial-next-btn:hover {
+  background: var(--cs-btn-hover);
+}
+
+.cs-tutorial-next-btn:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.45);
+  outline-offset: 2px;
+}
+
+/* ═══════════════════════════════════════════════════════
+   KEYFRAMES
+   ═══════════════════════════════════════════════════════ */
+@keyframes cs-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes cs-fade-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes cs-slide-up {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes cs-panel-enter {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
 @keyframes cs-card-enter {
   0%   { opacity: 0; transform: translateY(6px); }
   100% { opacity: 1; transform: translateY(0); }
@@ -690,12 +1638,29 @@ html {
   animation: cs-card-enter 0.35s ease-out both;
 }
 
-/* Rehearse warm shift transition on body */
-.cs-root {
-  transition: background 0.6s ease;
+@keyframes cs-breathe {
+  0%, 100% { transform: translateX(-50%) scaleY(1.000) translateY(0); }
+  50%       { transform: translateX(-50%) scaleY(1.006) translateY(-2px); }
 }
 
-/* ── REDUCED MOTION ────────────────────────────────────── */
+@keyframes cs-breathe-defensive {
+  0%, 100% { transform: translateX(calc(-50% + 6px)) scaleY(1.000) translateY(0); }
+  50%       { transform: translateX(calc(-50% + 6px)) scaleY(1.006) translateY(-2px); }
+}
+
+@keyframes cs-breathe-hurt {
+  0%, 100% { transform: translateX(calc(-50% - 4px)) scaleY(1.000) translateY(0); }
+  50%       { transform: translateX(calc(-50% - 4px)) scaleY(1.006) translateY(-2px); }
+}
+
+@keyframes cs-dot-pulse {
+  0%, 80%, 100% { opacity: 0.25; transform: scale(0.85); }
+  40%            { opacity: 1;    transform: scale(1); }
+}
+
+/* ═══════════════════════════════════════════════════════
+   REDUCED MOTION
+   ═══════════════════════════════════════════════════════ */
 @media (prefers-reduced-motion: reduce) {
   .cs-portrait-silhouette,
   .cs-portrait-silhouette[data-portrait-state="defensive"],
@@ -703,8 +1668,22 @@ html {
     animation: none;
   }
 
-  .cs-dialogue-card {
+  .cs-dialogue-card,
+  .cs-intent-panel,
+  .cs-compose-panel,
+  .cs-waiting-panel,
+  .cs-impact-panel,
+  .cs-closing-panel,
+  .cs-title-content,
+  .cs-prologue-content,
+  .cs-outcome-card,
+  .cs-pause-card,
+  .cs-tutorial-tooltip,
+  .cs-pause-overlay,
+  .cs-modal-backdrop,
+  .cs-prologue-para {
     animation: none;
+    transition: none;
   }
 
   .cs-thinking-dots span {
@@ -715,12 +1694,16 @@ html {
   .cs-root,
   .cs-say-btn,
   .cs-textarea,
-  .cs-portrait-silhouette {
+  .cs-portrait-silhouette,
+  .cs-hud-bar-fill,
+  .cs-outcome-stat-bar-fill {
     transition: none;
   }
 }
 
-/* ── DESKTOP — 1440 × 900 ──────────────────────────────── */
+/* ═══════════════════════════════════════════════════════
+   RESPONSIVE — DESKTOP 900+
+   ═══════════════════════════════════════════════════════ */
 @media (min-width: 900px) {
   :root {
     --cs-stage-ratio: 72%;
@@ -737,16 +1720,39 @@ html {
   }
 
   .cs-dock {
-    padding: 20px clamp(32px, 8%, 96px) 24px;
+    padding: 18px clamp(32px, 8%, 96px) 22px;
+  }
+
+  .cs-intent-grid {
+    grid-template-columns: repeat(4, 1fr);
   }
 
   .cs-say-btn {
-    width: 76px;
+    min-width: 76px;
+  }
+
+  .cs-hud-bar-track {
+    width: clamp(80px, 10vw, 120px);
   }
 }
 
-/* ── MOBILE — 390 × 844 ────────────────────────────────── */
-@media (max-width: 600px) {
+/* ═══════════════════════════════════════════════════════
+   RESPONSIVE — TABLET 600–899
+   ═══════════════════════════════════════════════════════ */
+@media (min-width: 600px) and (max-width: 899px) {
+  .cs-intent-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .cs-hud-bar-track {
+    width: 70px;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════
+   RESPONSIVE — MOBILE 0–599
+   ═══════════════════════════════════════════════════════ */
+@media (max-width: 599px) {
   :root {
     --cs-stage-ratio: 58%;
     --cs-dock-min: 200px;
@@ -768,19 +1774,46 @@ html {
 
   .cs-dock {
     padding: 12px 16px max(16px, env(safe-area-inset-bottom));
-    gap: 8px;
+  }
+
+  .cs-intent-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .cs-intent-btn {
+    min-height: 72px;
+    padding: 10px 6px;
+  }
+
+  .cs-intent-label {
+    font-size: 0.74rem;
+  }
+
+  .cs-intent-desc {
+    font-size: 0.68rem;
   }
 
   .cs-outcome-card {
     padding: 28px 24px;
   }
 
-  .cs-input-row {
-    gap: 8px;
+  .cs-hud-stats {
+    gap: 12px;
   }
 
-  .cs-say-btn {
-    width: 60px;
-    font-size: 0.82rem;
+  .cs-hud-bar-track {
+    width: 48px;
+  }
+
+  .cs-hud-stat-label {
+    font-size: 0.65rem;
+  }
+
+  .cs-pause-card {
+    padding: 28px 24px;
+  }
+
+  .cs-modal {
+    padding: 28px 24px;
   }
 }
