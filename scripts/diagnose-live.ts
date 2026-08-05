@@ -3,6 +3,7 @@ import { GeminiModelAdapter } from '../server/adapters/GeminiModelAdapter';
 import { ModelOutputSchema } from '../server/turn/schema';
 import { SCENARIO } from '../src/game/scenario';
 import { getRuntimeMode, getLiveRecovery } from '../server/adapters/factory';
+import { categorizeAdapterError } from '../server/turn/service';
 
 async function main() {
   const mode = getRuntimeMode();
@@ -38,6 +39,8 @@ async function main() {
   let success = false;
   let failureCategory = '';
   let httpStatus = '';
+  let retryAfterSec = '';
+  let causeCode = '';
   let schemaValid = false;
   let relevant = false;
 
@@ -62,21 +65,33 @@ async function main() {
     }
   } catch (error) {
     const latency = Date.now() - start;
-    if (error && typeof error === 'object' && 'status' in error) {
-      httpStatus = String((error as { status: number }).status);
-      failureCategory = `HTTP_${httpStatus}`;
-    } else if (error instanceof Error) {
-      const msg = error.message.toLowerCase();
-      if (msg.includes('timed out') || msg.includes('timeout')) failureCategory = 'TIMEOUT';
-      else if (msg.includes('network') || msg.includes('fetch failed')) failureCategory = 'NETWORK_ERROR';
-      else if (msg.includes('invalid json')) failureCategory = 'INVALID_JSON';
-      else if (msg.includes('empty content')) failureCategory = 'EMPTY_CONTENT';
-      else failureCategory = 'UNKNOWN_PROVIDER_ERROR';
-    }
-    console.log(`[DIAGNOSE] result=failure category=${failureCategory} httpStatus=${httpStatus} latencyMs=${latency}`);
+    const cat = categorizeAdapterError(error);
+    failureCategory = cat.category;
+    httpStatus = cat.status !== undefined ? String(cat.status) : '';
+    retryAfterSec = cat.retryAfter !== undefined ? String(cat.retryAfter) : '';
+    causeCode = cat.causeCode ?? '';
+
+    const extraParts = [
+      httpStatus ? `httpStatus=${httpStatus}` : null,
+      retryAfterSec ? `retryAfterSec=${retryAfterSec}` : null,
+      causeCode ? `causeCode=${causeCode}` : null,
+    ].filter(Boolean);
+    const extraStr = extraParts.length > 0 ? ` ${extraParts.join(' ')}` : '';
+
+    console.log(`[DIAGNOSE] result=failure category=${failureCategory}${extraStr} latencyMs=${latency}`);
   }
 
-  console.log(`[DIAGNOSE] summary: success=${success} category=${failureCategory || 'none'} schemaValid=${schemaValid} relevant=${relevant}`);
+  const summaryParts = [
+    `success=${success}`,
+    `category=${failureCategory || 'none'}`,
+    httpStatus ? `httpStatus=${httpStatus}` : null,
+    retryAfterSec ? `retryAfterSec=${retryAfterSec}` : null,
+    causeCode ? `causeCode=${causeCode}` : null,
+    `schemaValid=${schemaValid}`,
+    `relevant=${relevant}`,
+  ].filter(Boolean);
+
+  console.log(`[DIAGNOSE] summary: ${summaryParts.join(' ')}`);
   process.exitCode = success ? 0 : 1;
 }
 

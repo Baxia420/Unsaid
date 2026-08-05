@@ -126,3 +126,41 @@ describe('turn service detailed execution', () => {
     expect(result.source).toBe('deterministic-fallback');
   });
 });
+
+describe('categorizeAdapterError', () => {
+  it.each([
+    [400, 'HTTP_400', false],
+    [401, 'HTTP_401', false],
+    [403, 'HTTP_403', false],
+    [404, 'HTTP_404', false],
+    [429, 'HTTP_429', true],
+    [500, 'HTTP_5XX', true],
+    [503, 'HTTP_5XX', true],
+  ])('categorizes status %i as %s with retryable=%s', async (status, category, retryable) => {
+    const { categorizeAdapterError } = await import('../server/turn/service');
+    const { GeminiHttpError } = await import('../server/adapters/GeminiModelAdapter');
+    const err = new GeminiHttpError(status, `HTTP ${status}`, status === 429 ? 10 : undefined, 'REASON_CODE');
+    const cat = categorizeAdapterError(err);
+    expect(cat.category).toBe(category);
+    expect(cat.retryable).toBe(retryable);
+    expect(cat.status).toBe(status);
+    if (status === 429) expect(cat.retryAfter).toBe(10);
+    expect(cat.causeCode).toBe('REASON_CODE');
+    expect(cat.category).not.toBe('UNKNOWN_PROVIDER_ERROR');
+  });
+
+  it.each([
+    ['timed out after 15000ms', 'TIMEOUT', true],
+    ['fetch failed', 'NETWORK_ERROR', true],
+    ['network error occurred', 'NETWORK_ERROR', true],
+    ['invalid json in body', 'INVALID_JSON', false],
+    ['empty content returned', 'EMPTY_CONTENT', true],
+  ])('categorizes message "%s" as %s', async (msg, category, retryable) => {
+    const { categorizeAdapterError } = await import('../server/turn/service');
+    const err = new Error(msg);
+    const cat = categorizeAdapterError(err);
+    expect(cat.category).toBe(category);
+    expect(cat.retryable).toBe(retryable);
+    expect(cat.category).not.toBe('UNKNOWN_PROVIDER_ERROR');
+  });
+});

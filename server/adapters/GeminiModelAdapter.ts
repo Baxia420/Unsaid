@@ -25,7 +25,8 @@ export class GeminiHttpError extends Error {
   constructor(
     public readonly status: number,
     message: string,
-    public readonly retryAfter?: number
+    public readonly retryAfter?: number,
+    public readonly causeCode?: string
   ) {
     super(message);
     this.name = 'GeminiHttpError';
@@ -138,7 +139,10 @@ export class GeminiModelAdapter implements ModelAdapter {
       }
     }
 
-    throw new Error(redactSecret(lastError.message, this.apiKey));
+    if (lastError instanceof Error) {
+      lastError.message = redactSecret(lastError.message, this.apiKey);
+    }
+    throw lastError;
   }
 
   private async fetchOnce(body: unknown): Promise<unknown> {
@@ -170,8 +174,10 @@ export class GeminiModelAdapter implements ModelAdapter {
         }
 
         let detail = '';
+        let causeCode: string | undefined;
         try {
           const payload = (await response.json()) as GeminiGenerateContentResponse;
+          if (payload.error?.status) causeCode = payload.error.status;
           const parts = [
             payload.error?.code ? `code: ${payload.error.code}` : null,
             payload.error?.status ? `status: ${payload.error.status}` : null,
@@ -187,7 +193,8 @@ export class GeminiModelAdapter implements ModelAdapter {
             `Gemini returned HTTP ${response.status}${detail}`,
             this.apiKey
           ),
-          retryAfter
+          retryAfter,
+          causeCode
         );
       }
 
@@ -206,7 +213,13 @@ export class GeminiModelAdapter implements ModelAdapter {
         throw new Error('Gemini request timed out');
       }
       if (error instanceof Error) {
-        throw new Error(redactSecret(error.message, this.apiKey));
+        const redactedMsg = redactSecret(error.message, this.apiKey);
+        const causeCode = (error as { cause?: { code?: string } }).cause?.code;
+        const err = new Error(redactedMsg);
+        if (causeCode && typeof causeCode === 'string') {
+          (err as { causeCode?: string }).causeCode = causeCode;
+        }
+        throw err;
       }
       throw new Error('Gemini request failed due to network or provider error');
     } finally {

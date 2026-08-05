@@ -163,4 +163,23 @@ describe('Gemini adapter safety and retries', () => {
     await expect(new GeminiModelAdapter().generateTurn(makeRequest())).rejects.toThrow('timed out');
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
+  it('preserves GeminiHttpError with status, retryAfter, and causeCode after retry loop', async () => {
+    const errorDetail = { code: 429, status: 'RESOURCE_EXHAUSTED', message: 'Quota exceeded' };
+    const fetchMock = vi.fn().mockImplementation(() =>
+      Promise.resolve(providerResponse(errorDetail, 429, { 'Retry-After': '0' }))
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    try {
+      await new GeminiModelAdapter().generateTurn(makeRequest());
+      expect.fail('should have thrown');
+    } catch (err: unknown) {
+      const { GeminiHttpError } = await import('../server/adapters/GeminiModelAdapter');
+      expect(err).toBeInstanceOf(GeminiHttpError);
+      const httpErr = err as InstanceType<typeof GeminiHttpError>;
+      expect(httpErr.status).toBe(429);
+      expect(httpErr.retryAfter).toBe(0);
+      expect(httpErr.causeCode).toBe('RESOURCE_EXHAUSTED');
+      expect(httpErr.message).not.toContain('test-key');
+    }
+  }, 15000);
 });
