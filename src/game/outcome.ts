@@ -1,37 +1,21 @@
-import type { Intent, OutcomeId } from './types';
+import type { Alignment, OutcomeId, PerceivedImpact, TurnAssessment } from './types';
 
-const REPAIR_INTENTS: Intent[] = ['repair', 'acknowledge'];
-const SELF_PROTECTIVE_INTENTS: Intent[] = ['defend', 'minimize', 'redirect', 'pressure'];
-
-export interface OutcomeInputs {
-  intents: Intent[];
-  finalEngagement: number;
-  finalTension: number;
+const constructive = new Set<PerceivedImpact>(['understanding', 'acknowledgment', 'explanation', 'repair']);
+const harmful = new Set<PerceivedImpact>(['defense', 'minimization', 'pressure', 'avoidance']);
+export function classifyAlignment(intent: string, impact: PerceivedImpact): Alignment {
+  const direct: Record<string, PerceivedImpact> = { understand: 'understanding', acknowledge: 'acknowledgment', explain: 'explanation', repair: 'repair' };
+  if (direct[intent] === impact) return 'aligned';
+  if (harmful.has(impact)) return 'harmful_divergence';
+  return 'constructive_divergence';
 }
-
-export function evaluateOutcome(inputs: OutcomeInputs): OutcomeId {
-  const repairCount = inputs.intents.filter((i) => REPAIR_INTENTS.includes(i)).length;
-  const selfProtectiveCount = inputs.intents.filter((i) =>
-    SELF_PROTECTIVE_INTENTS.includes(i)
-  ).length;
-
-  const highlyTense = inputs.finalTension >= 5;
-  const nonEngaged = inputs.finalEngagement <= 0;
-  const positiveEngagement = inputs.finalEngagement > 0;
-  const notHighlyElevatedTension = inputs.finalTension < 5;
-
-  // The Speech if at least three turns are self-protective,
-  // OR final state is both highly tense and non-engaged.
-  if (selfProtectiveCount >= 3 || (highlyTense && nonEngaged)) {
-    return 'the_speech';
-  }
-
-  // Even if at least three turns are repair-oriented,
-  // final engagement is positive, and final tension is not highly elevated.
-  if (repairCount >= 3 && positiveEngagement && notHighlyElevatedTension) {
-    return 'even';
-  }
-
-  // Smoothed for all remaining valid paths.
+export function evaluateOutcome(input: { assessments: TurnAssessment[]; finalEngagement: number; finalTension: number }): OutcomeId {
+  const { assessments, finalEngagement, finalTension } = input;
+  const aligned = assessments.filter(a => a.alignment === 'aligned').length;
+  const harmfulCount = assessments.filter(a => a.alignment === 'harmful_divergence').length;
+  const constructiveCount = assessments.filter(a => constructive.has(a.perceivedImpact)).length;
+  const lateHarm = assessments.slice(-4).filter(a => harmful.has(a.perceivedImpact)).length;
+  const lateRepair = assessments.slice(-5).filter(a => a.perceivedImpact === 'repair' || a.perceivedImpact === 'acknowledgment').length;
+  if (harmfulCount >= 6 || lateHarm >= 3 || (finalTension >= 7 && finalEngagement <= -2)) return 'the_speech';
+  if (constructiveCount >= 7 && aligned >= 4 && finalEngagement >= 2 && finalTension <= 5 && lateRepair >= 2) return 'even';
   return 'smoothed';
 }

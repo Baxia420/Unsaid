@@ -35,7 +35,7 @@ Copy `.env.example` to `.env` and set variables as needed:
 | `UNSAID_AI_MODE` | `mock` | `mock` for local development; `recorded` for the deterministic demo-safe path; `live` for Gemini with recorded recovery |
 | `GEMINI_API_KEY` | *(none)* | Google AI Studio API key (required only for live mode) |
 | `GEMINI_BASE_URL` | `https://generativelanguage.googleapis.com/v1beta` | Gemini REST API base URL |
-| `GEMINI_MODEL` | `gemini-3.6-flash` | Model identifier |
+| `GEMINI_MODEL` | `gemini-3.5-flash-lite` | Model identifier |
 | `GEMINI_TIMEOUT_MS` | `15000` | Request timeout in milliseconds |
 
 **Default is mock.** No API key or paid account is required to run or develop locally.

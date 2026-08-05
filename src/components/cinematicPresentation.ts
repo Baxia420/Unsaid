@@ -42,7 +42,6 @@ export const CAFE_BACKGROUND = '/assets/cafe/cafe-window-afternoon.webp';
 
 export type VisualSceneState =
   | 'reality'
-  | 'rehearsing'
   | 'submitting'
   | 'error'
   | 'outcome';

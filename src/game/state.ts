@@ -1,4 +1,4 @@
-import { PortraitState, GameState } from './types';
+import type { PortraitState, GameState } from './types';
 import { SCENARIO } from './scenario';
 
 export function clamp(value: number, min: number, max: number): number {
@@ -9,10 +9,10 @@ export function derivePortraitState(
   engagement: number,
   tension: number
 ): PortraitState {
-  if (engagement < 0 && tension < 3) return "distant";
-  if (engagement < 0 && tension >= 3) return "defensive";
-  if (engagement >= 0 && tension >= 3) return "hurt_exposed";
-  return "connected";
+  if (engagement <= -2 && tension < 4) return 'distant';
+  if (tension >= 4 && engagement < 3) return 'defensive';
+  if (tension >= 2) return 'hurt_exposed';
+  return 'connected';
 }
 
 export function applyTurn(

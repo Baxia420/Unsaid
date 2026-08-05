@@ -17,24 +17,16 @@ interface GeminiGenerateContentRequest {
       type: 'OBJECT';
       properties: {
         characterText: { type: 'STRING' };
-        assessment: {
-          type: 'OBJECT';
-          properties: {
-            intent: {
-              type: 'STRING';
-              enum: string[];
-            };
-            engagementDelta: { type: 'INTEGER' };
-            tensionDelta: { type: 'INTEGER' };
-          };
-          required: string[];
-        };
+        perceivedImpact: { type: 'STRING'; enum: string[] };
+        impactReason: { type: 'STRING' };
+        engagementDelta: { type: 'INTEGER' };
+        tensionDelta: { type: 'INTEGER' };
+        finalClosures: { type: 'OBJECT'; properties: Record<string, { type: 'STRING' }>; required: string[] };
       };
       required: string[];
     };
   };
 }
-
 interface GeminiGenerateContentResponse {
   candidates?: Array<{
     content?: {
@@ -59,7 +51,6 @@ class GeminiHttpError extends Error {
     this.name = 'GeminiHttpError';
   }
 }
-
 function isTransientError(error: unknown): boolean {
   if (error instanceof Error) {
     if (error.name === 'AbortError') return true;
@@ -85,7 +76,7 @@ export class GeminiModelAdapter implements ModelAdapter {
       process.env.GEMINI_BASE_URL ||
       'https://generativelanguage.googleapis.com/v1beta';
     this.apiKey = process.env.GEMINI_API_KEY || '';
-    this.model = process.env.GEMINI_MODEL || 'gemini-3.6-flash';
+    this.model = process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite';
     this.timeoutMs = parseInt(process.env.GEMINI_TIMEOUT_MS || '15000', 10);
   }
 
@@ -102,34 +93,19 @@ export class GeminiModelAdapter implements ModelAdapter {
         },
       ],
       generationConfig: {
-        maxOutputTokens: 1024,
+        maxOutputTokens: 1400,
         responseMimeType: 'application/json',
         responseSchema: {
           type: 'OBJECT',
           properties: {
             characterText: { type: 'STRING' },
-            assessment: {
-              type: 'OBJECT',
-              properties: {
-                intent: {
-                  type: 'STRING',
-                  enum: [
-                    'acknowledge',
-                    'defend',
-                    'minimize',
-                    'redirect',
-                    'repair',
-                    'pressure',
-                    'unclear',
-                  ],
-                },
-                engagementDelta: { type: 'INTEGER' },
-                tensionDelta: { type: 'INTEGER' },
-              },
-              required: ['intent', 'engagementDelta', 'tensionDelta'],
-            },
+            perceivedImpact: { type: 'STRING', enum: ['understanding','acknowledgment','explanation','repair','defense','minimization','pressure','avoidance','unclear'] },
+            impactReason: { type: 'STRING' },
+            engagementDelta: { type: 'INTEGER' },
+            tensionDelta: { type: 'INTEGER' },
+            finalClosures: { type: 'OBJECT', properties: { even: { type: 'STRING' }, smoothed: { type: 'STRING' }, the_speech: { type: 'STRING' } }, required: ['even','smoothed','the_speech'] },
           },
-          required: ['characterText', 'assessment'],
+          required: ['characterText', 'perceivedImpact', 'impactReason', 'engagementDelta', 'tensionDelta'],
         },
       },
     };
