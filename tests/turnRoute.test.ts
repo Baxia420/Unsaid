@@ -6,10 +6,10 @@ import { createTurnRouter } from '../server/turn/route';
 import { SCENARIO } from '../src/game/scenario';
 import { makeModelOutput, makeRequest } from './helpers';
 
-function app(adapter: ModelAdapter) {
+function app(adapter: ModelAdapter, recoveryAdapter?: ModelAdapter, strictLive?: boolean) {
   const instance = express();
   instance.use(express.json());
-  instance.use('/api/turn', createTurnRouter(adapter));
+  instance.use('/api/turn', createTurnRouter(adapter, recoveryAdapter, { strictLive }));
   return instance;
 }
 
@@ -46,5 +46,48 @@ describe('turn route validation', () => {
     const response = await request(app(failing)).post('/api/turn').send(makeRequest());
     expect(response.status).toBe(200);
     expect(JSON.stringify(response.body)).not.toContain('secret-key');
+  });
+  it('returns 503 for strict live provider failure', async () => {
+    const failing: ModelAdapter = { generateTurn: vi.fn(async () => { throw new Error('provider down'); }) };
+    const response = await request(app(failing, undefined, true)).post('/api/turn').send(makeRequest());
+    expect(response.status).toBe(503);
+    expect(response.body.error).toBe('The conversation service is temporarily unavailable. Please retry.');
+  });
+  it('returns 503 for strict live schema failure', async () => {
+    const badSchema: ModelAdapter = { generateTurn: vi.fn(async () => ({ invalid: true })) };
+    const response = await request(app(badSchema, undefined, true)).post('/api/turn').send(makeRequest());
+    expect(response.status).toBe(503);
+    expect(response.body.error).toBe('The conversation service is temporarily unavailable. Please retry.');
+  });
+  it('sets source headers without credentials', async () => {
+    const response = await request(app(validAdapter)).post('/api/turn').send(makeRequest());
+    expect(response.status).toBe(200);
+    expect(response.headers['x-unsaid-turn-source']).toBeDefined();
+    expect(response.headers['x-unsaid-recovery-used']).toBeDefined();
+    expect(response.headers['x-unsaid-turn-source']).not.toContain('key');
+    expect(response.headers['x-unsaid-turn-source']).not.toContain('secret');
+  });
+  it('per-turn diagnostics never print the key', async () => {
+    const failing: ModelAdapter = { generateTurn: vi.fn(async () => { throw new Error('secret-key'); }) };
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    await request(app(failing)).post('/api/turn').send(makeRequest());
+    const output = log.mock.calls.flat().join(' ');
+    expect(output).not.toContain('secret-key');
+    expect(output).toContain('[UNSAID]');
+  });
+  it('allows recorded recovery in non-strict mode even when primary fails', async () => {
+    const failing: ModelAdapter = { generateTurn: vi.fn(async () => { throw new Error('provider down'); }) };
+    const recovery: ModelAdapter = { generateTurn: vi.fn(async () => makeModelOutput({ characterText: 'Recovered.' })) };
+    const response = await request(app(failing, recovery)).post('/api/turn').send(makeRequest());
+    expect(response.status).toBe(200);
+    expect(response.body.characterText).toBe('Recovered.');
+    expect(response.headers['x-unsaid-recovery-used']).toBe('true');
+  });
+  it('falls back to deterministic output when no recovery is available', async () => {
+    const failing: ModelAdapter = { generateTurn: vi.fn(async () => { throw new Error('provider down'); }) };
+    const response = await request(app(failing)).post('/api/turn').send(makeRequest());
+    expect(response.status).toBe(200);
+    expect(response.body.characterText).toBe(SCENARIO.fallbackCharacterLine);
+    expect(response.headers['x-unsaid-recovery-used']).toBe('false');
   });
 });

@@ -21,8 +21,12 @@ interface GeminiGenerateContentResponse {
   error?: { code?: number; message?: string; status?: string };
 }
 
-class GeminiHttpError extends Error {
-  constructor(public readonly status: number, message: string) {
+export class GeminiHttpError extends Error {
+  constructor(
+    public readonly status: number,
+    message: string,
+    public readonly retryAfter?: number
+  ) {
     super(message);
     this.name = 'GeminiHttpError';
   }
@@ -48,33 +52,37 @@ function redactSecret(message: string, secret: string): string {
   return secret ? message.split(secret).join('[REDACTED]') : message;
 }
 
-function createResponseSchema() {
-  return {
-    type: 'OBJECT',
-    properties: {
-      characterText: { type: 'STRING' },
-      perceivedImpact: { type: 'STRING', enum: IMPACT_VALUES },
-      impactReason: { type: 'STRING' },
-      engagementDelta: { type: 'INTEGER' },
-      tensionDelta: { type: 'INTEGER' },
-      finalClosures: {
-        type: 'OBJECT',
-        properties: {
-          even: { type: 'STRING' },
-          smoothed: { type: 'STRING' },
-          the_speech: { type: 'STRING' },
-        },
-        required: ['even', 'smoothed', 'the_speech'],
-      },
-    },
-    required: [
-      'characterText',
-      'perceivedImpact',
-      'impactReason',
-      'engagementDelta',
-      'tensionDelta',
-    ],
+function createResponseSchema(isFinalTurn: boolean) {
+  const properties: Record<string, unknown> = {
+    characterText: { type: 'STRING' },
+    perceivedImpact: { type: 'STRING', enum: IMPACT_VALUES },
+    impactReason: { type: 'STRING' },
+    engagementDelta: { type: 'INTEGER' },
+    tensionDelta: { type: 'INTEGER' },
   };
+
+  if (isFinalTurn) {
+    properties.finalClosures = {
+      type: 'OBJECT',
+      properties: {
+        even: { type: 'STRING' },
+        smoothed: { type: 'STRING' },
+        the_speech: { type: 'STRING' },
+      },
+      required: ['even', 'smoothed', 'the_speech'],
+    };
+  }
+
+  const required = [
+    'characterText',
+    'perceivedImpact',
+    'impactReason',
+    'engagementDelta',
+    'tensionDelta',
+  ];
+  if (isFinalTurn) required.push('finalClosures');
+
+  return { type: 'OBJECT', properties, required };
 }
 
 export class GeminiModelAdapter implements ModelAdapter {
@@ -103,7 +111,7 @@ export class GeminiModelAdapter implements ModelAdapter {
       generationConfig: {
         maxOutputTokens: 1400,
         responseMimeType: 'application/json',
-        responseSchema: createResponseSchema(),
+        responseSchema: createResponseSchema(request.turnIndex === 14),
       },
     };
 
@@ -117,7 +125,15 @@ export class GeminiModelAdapter implements ModelAdapter {
         const retryable =
           isTransientError(error) ||
           (error instanceof GeminiHttpError && isTransientStatus(error.status));
-        if (attempt === 0 && retryable) continue;
+        if (attempt === 0 && retryable) {
+          if (error instanceof GeminiHttpError && error.status === 429) {
+            const delayMs = error.retryAfter !== undefined
+              ? Math.min(error.retryAfter * 1000, 10000)
+              : 4000;
+            await new Promise<void>((r) => setTimeout(r, delayMs));
+          }
+          continue;
+        }
         break;
       }
     }
@@ -146,6 +162,13 @@ export class GeminiModelAdapter implements ModelAdapter {
       });
 
       if (!response.ok) {
+        let retryAfter: number | undefined;
+        const retryAfterHeader = response.headers.get('retry-after');
+        if (retryAfterHeader) {
+          const parsed = parseInt(retryAfterHeader, 10);
+          if (!Number.isNaN(parsed)) retryAfter = parsed;
+        }
+
         let detail = '';
         try {
           const payload = (await response.json()) as GeminiGenerateContentResponse;
@@ -163,7 +186,8 @@ export class GeminiModelAdapter implements ModelAdapter {
           redactSecret(
             `Gemini returned HTTP ${response.status}${detail}`,
             this.apiKey
-          )
+          ),
+          retryAfter
         );
       }
 

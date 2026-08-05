@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { ModelAdapter } from '../server/adapters/ModelAdapter';
-import { makeFallback, processTurn } from '../server/turn/service';
+import { makeFallback, processTurn, processTurnDetailed } from '../server/turn/service';
 import { SCENARIO } from '../src/game/scenario';
 import { CLOSURES, makeModelOutput, makeRequest } from './helpers';
 
@@ -76,5 +76,53 @@ describe('turn service', () => {
   it.each([[-4, 0], [4, 0], [0, 4]])('rejects invalid deltas %s/%s before client', async (engagementDelta, tensionDelta) => {
     const result = await processTurn(makeRequest(), adapter(makeModelOutput({ engagementDelta, tensionDelta })));
     expect(result.assessment).toMatchObject({ engagementDelta: 0, tensionDelta: 0 });
+  });
+});
+
+describe('turn service detailed execution', () => {
+  it('reports source=gemini on success', async () => {
+    const result = await processTurnDetailed(makeRequest(), adapter(makeModelOutput()));
+    expect(result.source).toBe('gemini');
+    expect(result.recoveryUsed).toBe(false);
+    expect(result.failureCategory).toBeUndefined();
+  });
+  it('reports source=recorded-recovery when recovery succeeds', async () => {
+    const primary = adapter({ invalid: true });
+    const recovery = adapter(makeModelOutput({ characterText: 'Recovered.' }));
+    const result = await processTurnDetailed(makeRequest(), primary, recovery);
+    expect(result.source).toBe('recorded-recovery');
+    expect(result.recoveryUsed).toBe(true);
+    expect(result.failureCategory).toBeDefined();
+  });
+  it('reports source=deterministic-fallback when everything fails', async () => {
+    const result = await processTurnDetailed(makeRequest(), adapter(null, true), adapter({ bad: true }));
+    expect(result.source).toBe('deterministic-fallback');
+    expect(result.recoveryUsed).toBe(false);
+    expect(result.failureCategory).toBeDefined();
+  });
+  it('reports failure category for HTTP errors', async () => {
+    const httpAdapter: ModelAdapter = {
+      generateTurn: vi.fn(async () => {
+        const err = new Error('Gemini returned HTTP 429');
+        (err as unknown as Record<string, unknown>).status = 429;
+        throw err;
+      }),
+    };
+    const result = await processTurnDetailed(makeRequest(), httpAdapter);
+    expect(result.source).toBe('deterministic-fallback');
+    expect(result.failureCategory).toBe('HTTP_429');
+    expect(result.retryable).toBe(true);
+  });
+  it('reports failure category for schema invalid', async () => {
+    const result = await processTurnDetailed(makeRequest(), adapter({ invalid: true }));
+    expect(result.source).toBe('deterministic-fallback');
+    expect(result.failureCategory).toBe('SCHEMA_INVALID');
+    expect(result.retryable).toBe(false);
+  });
+  it('does not recurse when primary and recovery are identical', async () => {
+    const broken = adapter(null, true);
+    const result = await processTurnDetailed(makeRequest(), broken, broken);
+    expect(broken.generateTurn).toHaveBeenCalledOnce();
+    expect(result.source).toBe('deterministic-fallback');
   });
 });

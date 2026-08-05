@@ -10,10 +10,8 @@ import { existsSync, readFileSync } from 'fs';
 import { resolve } from 'path';
 import { describe, expect, it, beforeEach } from 'vitest';
 import {
-  CAFE_BACKGROUND,
   PORTRAIT_OPEN,
   PORTRAIT_CLOSED,
-  PORTRAIT_DATA_STATE,
   BLINK_SRC,
   computeOutcomeSummary,
   cinematicPresentation,

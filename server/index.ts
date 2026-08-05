@@ -4,6 +4,7 @@ import {
   createModelAdapter,
   createRecoveryAdapter,
   getRuntimeMode,
+  getLiveRecovery,
 } from './adapters/factory';
 
 const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
@@ -31,13 +32,19 @@ export function createApp(): express.Express {
 
   const adapter = createModelAdapter();
   const recoveryAdapter = createRecoveryAdapter();
+  const mode = getRuntimeMode();
+  const recovery = getLiveRecovery();
+  const keyConfigured = Boolean(process.env.GEMINI_API_KEY?.trim());
+  const model = process.env.GEMINI_MODEL ?? 'gemini-3.5-flash-lite';
+  console.log(`[UNSAID] AI runtime: mode=${mode} model=${model} keyConfigured=${keyConfigured} recovery=${recovery}`);
+
   app.get('/api/status', (_req, res) => {
     res.json({
-      aiMode: getRuntimeMode(),
-      recoveryMode: recoveryAdapter ? 'recorded' : null,
+      aiMode: mode,
+      recoveryMode: recovery,
     });
   });
-  app.use('/api/turn', createTurnRouter(adapter, recoveryAdapter));
+  app.use('/api/turn', createTurnRouter(adapter, recoveryAdapter, { strictLive: mode === 'live' && recovery === 'none' }));
 
   app.use(errorHandler);
 

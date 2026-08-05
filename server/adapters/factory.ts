@@ -22,10 +22,15 @@ export function createModelAdapter(): ModelAdapter {
 }
 
 export function createRecoveryAdapter(): ModelAdapter | undefined {
-  const hasLiveKey = Boolean(process.env.GEMINI_API_KEY?.trim());
-  return process.env.UNSAID_AI_MODE === 'live' && hasLiveKey
-    ? new RecordedModelAdapter()
-    : undefined;
+  if (process.env.UNSAID_AI_MODE !== 'live') return undefined;
+  if (getLiveRecovery() !== 'recorded') return undefined;
+  return new RecordedModelAdapter();
+}
+
+export function getLiveRecovery(): 'none' | 'recorded' {
+  const recovery = process.env.UNSAID_LIVE_RECOVERY?.trim().toLowerCase();
+  if (recovery === 'recorded') return 'recorded';
+  return 'none';
 }
 
 export function getRuntimeMode(): 'live' | 'recorded' | 'mock' {

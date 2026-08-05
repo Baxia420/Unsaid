@@ -4,14 +4,14 @@ import { makeModelOutput, makeRequest } from './helpers';
 
 const ORIGINAL_ENV = { ...process.env };
 
-function providerResponse(content: unknown, status = 200): Response {
+function providerResponse(content: unknown, status = 200, extraHeaders?: Record<string, string>): Response {
   return new Response(
     JSON.stringify(
       status === 200
         ? { candidates: [{ content: { parts: [{ text: typeof content === 'string' ? content : JSON.stringify(content) }] } }] }
         : { error: content }
     ),
-    { status, headers: { 'Content-Type': 'application/json' } }
+    { status, headers: { 'Content-Type': 'application/json', ...extraHeaders } }
   );
 }
 
@@ -67,13 +67,21 @@ describe('Gemini adapter request construction', () => {
       'understanding','acknowledgment','explanation','repair','defense','minimization','pressure','avoidance','unclear',
     ]);
   });
-  it('defines finalClosures but does not require it on ordinary turns', async () => {
+  it('omits finalClosures from ordinary-turn schemas', async () => {
     const fetchMock = vi.fn().mockResolvedValue(providerResponse(makeModelOutput()));
     vi.stubGlobal('fetch', fetchMock);
-    await new GeminiModelAdapter().generateTurn(makeRequest());
+    await new GeminiModelAdapter().generateTurn(makeRequest({ turnIndex: 0 }));
+    const schema = JSON.parse(fetchMock.mock.calls[0][1].body).generationConfig.responseSchema;
+    expect(schema.properties.finalClosures).toBeUndefined();
+    expect(schema.required).not.toContain('finalClosures');
+  });
+  it('includes finalClosures in turn-15 schema', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(providerResponse(makeModelOutput()));
+    vi.stubGlobal('fetch', fetchMock);
+    await new GeminiModelAdapter().generateTurn(makeRequest({ turnIndex: 14 }));
     const schema = JSON.parse(fetchMock.mock.calls[0][1].body).generationConfig.responseSchema;
     expect(schema.properties.finalClosures).toBeDefined();
-    expect(schema.required).not.toContain('finalClosures');
+    expect(schema.required).toContain('finalClosures');
   });
 });
 
@@ -99,7 +107,26 @@ describe('Gemini adapter safety and retries', () => {
     await expect(new GeminiModelAdapter().generateTurn(makeRequest())).resolves.toBeDefined();
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
-  it.each([429, 500, 503])('retries HTTP %s once', async (status) => {
+  it('retries HTTP 429 once with bounded delay', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(providerResponse({ message: 'temporary' }, 429)).mockResolvedValueOnce(providerResponse(makeModelOutput()));
+    vi.stubGlobal('fetch', fetchMock);
+    const start = Date.now();
+    await new GeminiModelAdapter().generateTurn(makeRequest());
+    const elapsed = Date.now() - start;
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(elapsed).toBeGreaterThanOrEqual(3000);
+  }, 10000);
+  it('retries HTTP 429 and respects Retry-After header', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(providerResponse({ message: 'rate limit' }, 429, { 'Retry-After': '2' })).mockResolvedValueOnce(providerResponse(makeModelOutput()));
+    vi.stubGlobal('fetch', fetchMock);
+    const start = Date.now();
+    await new GeminiModelAdapter().generateTurn(makeRequest());
+    const elapsed = Date.now() - start;
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(elapsed).toBeGreaterThanOrEqual(1500);
+    expect(elapsed).toBeLessThan(6000);
+  }, 10000);
+  it.each([500, 503])('retries HTTP %s once', async (status) => {
     const fetchMock = vi.fn().mockResolvedValueOnce(providerResponse({ message: 'temporary' }, status)).mockResolvedValueOnce(providerResponse(makeModelOutput()));
     vi.stubGlobal('fetch', fetchMock);
     await new GeminiModelAdapter().generateTurn(makeRequest());

@@ -28,11 +28,12 @@ npm install
 
 ## Environment Variables
 
-Copy `.env.example` to `.env` and set variables as needed:
+Copy `.env.example` to `.env` and set variables as needed. `.env` is ignored by Git and must never be committed.
 
 | Variable | Default | Description |
 |---|---|---|
-| `UNSAID_AI_MODE` | `mock` | `mock` for local development; `recorded` for the deterministic demo-safe path; `live` for Gemini with recorded recovery |
+| `UNSAID_AI_MODE` | `mock` | `mock` for local development; `recorded` for the deterministic demo-safe path; `live` for Gemini |
+| `UNSAID_LIVE_RECOVERY` | `none` | `none` for strict live mode (recommended); `recorded` for one explicit recorded recovery attempt on provider failure |
 | `GEMINI_API_KEY` | *(none)* | Google AI Studio API key (required only for live mode) |
 | `GEMINI_BASE_URL` | `https://generativelanguage.googleapis.com/v1beta` | Gemini REST API base URL |
 | `GEMINI_MODEL` | `gemini-3.5-flash-lite` | Model identifier |
@@ -40,7 +41,23 @@ Copy `.env.example` to `.env` and set variables as needed:
 
 **Default is mock.** No API key or paid account is required to run or develop locally.
 
-**Live mode** uses the Google Gemini Developer API via Google AI Studio. If a live response fails validation or inference throws, the server recovers through the local recorded adapter. If `UNSAID_AI_MODE=live` is set but `GEMINI_API_KEY` is missing or blank, the server emits one warning and runs in recorded mode. No live-AI claim should be made while recorded mode is active; `/api/status` reports the active and recovery modes.
+**Mock mode** (`UNSAID_AI_MODE=mock`) uses `MockModelAdapter` and produces deterministic, keyword-based responses with no network calls.
+
+**Recorded mode** (`UNSAID_AI_MODE=recorded`) uses `RecordedModelAdapter` and produces deterministic, scripted responses with no network calls.
+
+**Strict live mode** (`UNSAID_AI_MODE=live`, `UNSAID_LIVE_RECOVERY=none`) sends every turn to Gemini. If the provider fails or returns invalid output, the server returns HTTP 503 so the client can retry. The turn is not consumed and no silent fallback to mock or recorded dialogue occurs.
+
+**Optional recorded recovery** (`UNSAID_AI_MODE=live`, `UNSAID_LIVE_RECOVERY=recorded`) uses Gemini as the primary adapter. On a single provider failure, it attempts one bounded recovery via `RecordedModelAdapter`. Recovery is explicitly logged and identified in response headers (`X-Unsaid-Recovery-Used`).
+
+If `UNSAID_AI_MODE=live` is set but `GEMINI_API_KEY` is missing or blank, the server emits one warning and runs in recorded mode. No live-AI claim should be made while recorded mode is active; `/api/status` reports the active and recovery modes.
+
+### Diagnostic Script
+
+```bash
+npm run diagnose:live
+```
+
+This script sends one distinctive test message to Gemini and reports sanitized diagnostics including mode, model, key presence, source, latency, and schema validity. It requires `UNSAID_AI_MODE=live` and a valid `GEMINI_API_KEY`. No secrets are printed. The script exits naturally without calling `process.exit()`.
 
 ## Development
 
@@ -64,6 +81,7 @@ All requests to `/api/*` from the browser are proxied to the Express server (`ht
 | `npm run type-check` | Run TypeScript type checking (`tsc --noEmit`) |
 | `npm run test` | Run the full Vitest test suite |
 | `npm run build` | Production build (TypeScript compilation + Vite bundle to `dist/`) |
+| `npm run diagnose:live` | One-shot live Gemini diagnostic (mode, key, source, latency, schema validity) |
 
 ## Default Runtime
 
