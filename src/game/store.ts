@@ -34,11 +34,15 @@ interface GameData {
   pendingIntention: PlayerIntent | null;
   runId: number;
   activeRequestId: number | null;
+  prologuePart: number;
 }
 
 export interface GameStore extends GameData {
   start: () => void;
   continueFromPrologue: () => void;
+  nextProloguePart: () => void;
+  prevProloguePart: () => void;
+  skipPrologue: () => void;
   selectIntention: (intent: PlayerIntent) => void;
   setInput: (input: string) => void;
   submitTurn: () => Promise<void>;
@@ -72,6 +76,7 @@ export function createInitialState(runId = 0): GameData {
     pendingIntention: null,
     runId,
     activeRequestId: null,
+    prologuePart: 0,
   };
 }
 
@@ -188,7 +193,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   start: () => {
     const runId = get().runId + 1;
-    set({ ...createInitialState(runId), mode: 'prologue' });
+    set({ ...createInitialState(runId), mode: 'prologue', prologuePart: 0 });
   },
 
   continueFromPrologue: () => {
@@ -197,6 +202,31 @@ export const useGameStore = create<GameStore>((set, get) => ({
       mode: 'playing',
       transcript: [{ speaker: 'character', text: SCENARIO.openingLine }],
     });
+  },
+
+  nextProloguePart: () => {
+    if (get().mode !== 'prologue') return;
+    const nextPart = get().prologuePart + 1;
+    if (nextPart >= SCENARIO.prologueParts.length) {
+      get().continueFromPrologue();
+    } else {
+      set({ prologuePart: nextPart });
+    }
+  },
+
+  prevProloguePart: () => {
+    if (get().mode !== 'prologue') return;
+    const prevPart = get().prologuePart - 1;
+    if (prevPart < 0) {
+      set({ mode: 'title', prologuePart: 0 });
+    } else {
+      set({ prologuePart: prevPart });
+    }
+  },
+
+  skipPrologue: () => {
+    if (get().mode !== 'prologue') return;
+    get().continueFromPrologue();
   },
 
   selectIntention: (selectedIntention) => set({ selectedIntention }),
@@ -272,7 +302,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   restart: () => {
     const runId = get().runId + 1;
-    set({ ...createInitialState(runId), mode: 'prologue' });
+    set({ ...createInitialState(runId), mode: 'prologue', prologuePart: 0 });
   },
 
   returnToTitle: () => {

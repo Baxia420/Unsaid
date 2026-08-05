@@ -36,7 +36,7 @@ export const EVALUATION_CASES: EvaluationCase[] = [
   { name: 'minimization', intention: 'explain', playerText: "It was one event. I don't understand why this became such a huge thing.", acceptableImpacts: ['minimization', 'defense'] },
   { name: 'avoidance', intention: 'understand', playerText: 'Anyway, how has work been?', acceptableImpacts: ['avoidance'] },
   { name: 'pressure disguised as repair', intention: 'repair', playerText: "Can you please just say we're okay so we can move on?", acceptableImpacts: ['pressure'] },
-  { name: 'genuine repair', intention: 'repair', playerText: 'I know an apology does not rebuild trust. What would I need to do differently?', acceptableImpacts: ['repair', 'understanding'] },
+  { name: 'patient repair', intention: 'repair', playerText: 'I know an apology does not rebuild trust. I can wait, and you do not have to decide what happens next tonight.', acceptableImpacts: ['repair', 'understanding', 'acknowledgment'] },
   { name: 'confusing input', intention: 'explain', playerText: 'The blue folder was louder yesterday, I guess.', acceptableImpacts: ['unclear', 'avoidance'] },
   { name: 'recovery after harm', intention: 'acknowledge', playerText: 'I kept defending myself. You were waiting, I lied, and I hurt you.', acceptableImpacts: ['acknowledgment'], transcript: [...FIXED_TRANSCRIPT, { speaker: 'player', text: 'It was just one event.' }, { speaker: 'character', text: 'It was the waiting and the lie.' }] },
   { name: 'late deterioration', intention: 'repair', playerText: "I've apologized enough. Can you just forgive me now?", acceptableImpacts: ['pressure', 'defense'], transcript: [...FIXED_TRANSCRIPT, { speaker: 'player', text: 'I understand why you were hurt.' }, { speaker: 'character', text: 'I appreciate that.' }] },
@@ -61,12 +61,22 @@ function createAdapter(mode: EvaluatorMode): ModelAdapter {
 
 function validateQuality(
   evaluationCase: EvaluationCase,
-  output: ModelOutput
+  output: ModelOutput,
+  mode: EvaluatorMode,
 ): string[] {
   const failures: string[] = [];
   if (output.characterText.length > 800) failures.push('dialogue is too long');
   if (/\b(ai|prompt|game mechanic|score|outcome title)\b/i.test(output.characterText)) {
     failures.push('dialogue exposed system terminology');
+  }
+  if (/\b(emotional labor|accountability framework|intent versus impact|holding space|processing|communication pattern|player)\b/i.test(output.characterText)) {
+    failures.push('dialogue used forbidden clinical or system language');
+  }
+  if (mode === 'live') {
+    const words = output.characterText.trim().split(/\s+/).filter(Boolean).length;
+    const sentences = output.characterText.split(/[.!?]+/).filter((part) => part.trim()).length;
+    if (words < 45 || words > 100) failures.push(`dialogue word count ${words} is outside 45–100`);
+    if (sentences < 3 || sentences > 6) failures.push(`dialogue sentence count ${sentences} is outside 3–6`);
   }
   if (!evaluationCase.acceptableImpacts.includes(output.perceivedImpact)) {
     failures.push(`unexpected impact ${output.perceivedImpact}`);
@@ -83,10 +93,17 @@ function validateQuality(
 async function run(): Promise<void> {
   const mode = parseMode();
   const adapter = createAdapter(mode);
-  const cases = mode === 'live' ? EVALUATION_CASES.slice(0, 5) : EVALUATION_CASES;
+  const liveCaseOrder = ['acknowledge', 'understand', 'patient repair'];
+  const cases = mode === 'live'
+    ? liveCaseOrder.map((name) => EVALUATION_CASES.find((evaluationCase) => evaluationCase.name === name)!)
+    : EVALUATION_CASES;
   let passed = 0;
+  const openings = new Set<string>();
 
-  for (const evaluationCase of cases) {
+  for (const [index, evaluationCase] of cases.entries()) {
+    if (mode === 'live' && index > 0) {
+      await new Promise((resolveDelay) => setTimeout(resolveDelay, 5_000));
+    }
     const request: TurnRequest = {
       scenarioId: SCENARIO.id,
       turnIndex: evaluationCase.turnIndex ?? 4,
@@ -100,15 +117,20 @@ async function run(): Promise<void> {
       console.log(`${evaluationCase.name}: FAIL (schema)`);
       continue;
     }
-    const failures = validateQuality(evaluationCase, parsed.data);
+    const failures = validateQuality(evaluationCase, parsed.data, mode);
     if (failures.length) {
       console.log(`${evaluationCase.name}: FAIL (${failures.join(', ')})`);
       continue;
     }
+    openings.add(parsed.data.characterText.trim().split(/\s+/).slice(0, 4).join(' ').toLowerCase());
     passed += 1;
     console.log(`${evaluationCase.name}: PASS`);
   }
 
+  if (mode === 'live' && openings.size !== cases.length) {
+    console.log('live evaluator: FAIL (repeated opening)');
+    process.exitCode = 1;
+  }
   console.log(`${mode} evaluator: ${passed}/${cases.length} passed`);
   if (passed !== cases.length) process.exitCode = 1;
 }

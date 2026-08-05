@@ -2,7 +2,7 @@
  * UNSAID — ConversationScene.tsx
  * Full-viewport cinematic conversation shell.
  *
- * Screens:            title | prologue | playing | closing | outcome
+ * Screens:            title | prologue | playing | paused | closing | outcome
  * Interaction stages: choose-intent | compose | waiting | impact
  *
  * Core game state lives exclusively in the store.
@@ -12,6 +12,7 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type KeyboardEvent,
@@ -22,11 +23,17 @@ import { SCENARIO } from '../game/scenario';
 import {
   CAFE_BACKGROUND,
   PORTRAIT_OPEN,
+  PORTRAIT_CLOSED,
   PORTRAIT_DATA_STATE,
-  cinematicPresentation,
   computeOutcomeSummary,
+  getConnectionLabel,
+  getPressureLabel,
+  getReflection,
+  getReviewSummary,
+  generateReadTheRoomHint,
+  humanizeLabel,
 } from './cinematicPresentation';
-import type { PlayerIntent, TurnAssessment } from '../game/types';
+import type { PlayerIntent, PortraitState, TurnAssessment } from '../game/types';
 import './ConversationScene.css';
 
 // ─── Presentation-local types ──────────────────────────
@@ -36,198 +43,312 @@ type InteractionStage =
   | 'waiting'
   | 'impact';
 
-// ─── Intention definitions ─────────────────────────────
+type TUTORIAL_STEP = 0 | 1 | 2;
+
 interface IntentionDef {
   id: PlayerIntent;
   label: string;
-  desc: string;
-  icon: React.ReactElement;
+  description: string;
+  icon: string;
 }
 
-const INTENTIONS: IntentionDef[] = [
-  {
-    id: 'understand',
-    label: 'Understand',
-    desc: 'Ask and listen',
-    icon: (
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <circle cx="12" cy="12" r="10"/>
-        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
-        <circle cx="12" cy="17" r="0.8" fill="currentColor" stroke="none"/>
-      </svg>
-    ),
-  },
-  {
-    id: 'acknowledge',
-    label: 'Acknowledge',
-    desc: 'Own the harm',
-    icon: (
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0"/>
-        <path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2"/>
-        <path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8"/>
-        <path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/>
-      </svg>
-    ),
-  },
-  {
-    id: 'explain',
-    label: 'Explain',
-    desc: 'Give context',
-    icon: (
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-        <line x1="9" y1="9" x2="15" y2="9"/>
-        <line x1="9" y1="13" x2="13" y2="13"/>
-      </svg>
-    ),
-  },
-  {
-    id: 'repair',
-    label: 'Repair',
-    desc: 'Offer a next step',
-    icon: (
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
-        <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
-      </svg>
-    ),
-  },
+const INTENTS: IntentionDef[] = [
+  { id: 'understand', label: 'Understand', description: 'Ask and listen', icon: '?' },
+  { id: 'acknowledge', label: 'Acknowledge', description: 'Own the harm', icon: '✓' },
+  { id: 'explain', label: 'Explain', description: 'Give honest context', icon: '…' },
+  { id: 'repair', label: 'Repair', description: 'Offer a next step', icon: '↗' },
 ];
 
-// ─── Tutorial localStorage helpers ─────────────────────
+// ─── Tutorial helpers ──────────────────────────────────
 const TUTORIAL_KEY = 'unsaid_tutorial_done';
-
+function writeTutorialDone(value: boolean) {
+  try {
+    localStorage.setItem(TUTORIAL_KEY, value ? '1' : '');
+  } catch {
+    /* ignore */
+  }
+}
 function readTutorialDone(): boolean {
-  try { return localStorage.getItem(TUTORIAL_KEY) === '1'; }
-  catch { return false; }
+  try {
+    return localStorage.getItem(TUTORIAL_KEY) === '1';
+  } catch {
+    return false;
+  }
 }
 
-function writeTutorialDone(): void {
-  try { localStorage.setItem(TUTORIAL_KEY, '1'); }
-  catch { /* storage unavailable — gameplay continues */ }
+// Reduced-motion hook
+function useReducedMotion(): boolean {
+  const [reduced, setReduced] = useState(false);
+  useEffect(() => {
+    const mql = window.matchMedia('(prefers-reduced-motion: reduce)');
+    setReduced(mql.matches);
+    const handler = (e: MediaQueryListEvent) => setReduced(e.matches);
+    mql.addEventListener('change', handler);
+    return () => mql.removeEventListener('change', handler);
+  }, []);
+  return reduced;
 }
 
-// ─── Main component ────────────────────────────────────
+// ═══════════════════════════════════════════════════════
+// MAIN COMPONENT
+// ═══════════════════════════════════════════════════════
 export default function ConversationScene() {
-  // ── Store bindings ────────────────────────────────────
-  const mode             = useGameStore(s => s.mode);
-  const status           = useGameStore(s => s.status);
-  const error            = useGameStore(s => s.error);
-  const engagement       = useGameStore(s => s.engagement);
-  const tension          = useGameStore(s => s.tension);
-  const portraitState    = useGameStore(s => s.portraitState);
-  const transcript       = useGameStore(s => s.transcript);
-  const turnIndex        = useGameStore(s => s.turnIndex);
-  const assessments      = useGameStore(s => s.assessments);
-  const outcome          = useGameStore(s => s.outcome);
-  const closingMessage   = useGameStore(s => s.closingMessage);
-  const selectedIntention = useGameStore(s => s.selectedIntention);
+  // ── Store bindings ───────────────────────────────────
+  const mode = useGameStore((s) => s.mode);
+  const status = useGameStore((s) => s.status);
+  const error = useGameStore((s) => s.error);
+  const transcript = useGameStore((s) => s.transcript);
+  const turnIndex = useGameStore((s) => s.turnIndex);
+  const selectedIntention = useGameStore((s) => s.selectedIntention);
+  const outcome = useGameStore((s) => s.outcome);
+  const closingMessage = useGameStore((s) => s.closingMessage);
+  const assessments = useGameStore((s) => s.assessments);
+  const engagement = useGameStore((s) => s.engagement);
+  const tension = useGameStore((s) => s.tension);
+  const portraitState = useGameStore((s) => s.portraitState);
+  const prologuePart = useGameStore((s) => s.prologuePart);
 
-  const storeStart           = useGameStore(s => s.start);
-  const continueFromPrologue = useGameStore(s => s.continueFromPrologue);
-  const selectIntention      = useGameStore(s => s.selectIntention);
-  const setInput             = useGameStore(s => s.setInput);
-  const submitTurn           = useGameStore(s => s.submitTurn);
-  const retryTurn            = useGameStore(s => s.retryTurn);
-  const storePause           = useGameStore(s => s.pause);
-  const storeResume          = useGameStore(s => s.resume);
-  const continueToOutcome    = useGameStore(s => s.continueToOutcome);
-  const storeRestart         = useGameStore(s => s.restart);
-  const returnToTitle        = useGameStore(s => s.returnToTitle);
+  const storeStart = useGameStore((s) => s.start);
+  const continueFromPrologue = useGameStore((s) => s.continueFromPrologue);
+  const nextProloguePart = useGameStore((s) => s.nextProloguePart);
+  const prevProloguePart = useGameStore((s) => s.prevProloguePart);
+  const skipPrologue = useGameStore((s) => s.skipPrologue);
+  const selectIntention = useGameStore((s) => s.selectIntention);
+  const setInput = useGameStore((s) => s.setInput);
+  const submitTurn = useGameStore((s) => s.submitTurn);
+  const retryTurn = useGameStore((s) => s.retryTurn);
+  const storePause = useGameStore((s) => s.pause);
+  const storeResume = useGameStore((s) => s.resume);
+  const continueToOutcome = useGameStore((s) => s.continueToOutcome);
+  const storeRestart = useGameStore((s) => s.restart);
+  const returnToTitle = useGameStore((s) => s.returnToTitle);
 
-  // ── Presentation state ────────────────────────────────
-  const [stage, setStage]                 = useState<InteractionStage>('choose-intent');
-  const [draft, setDraft]                 = useState('');
+  // ── Presentation state ───────────────────────────────
+  const [stage, setStage] = useState<InteractionStage>('choose-intent');
+  const [draft, setDraft] = useState('');
   const [draftIntentId, setDraftIntentId] = useState<PlayerIntent | null>(null);
   const [lastAssessment, setLastAssessment] = useState<TurnAssessment | null>(null);
-  const prevTurnIndex                     = useRef(turnIndex);
-
-  // Portrait fallback
+  const prevTurnIndex = useRef(turnIndex);
   const [portraitFailed, setFailedPortrait] = useState(false);
-
-  // Pause confirmations
   const [showRestartConfirm, setShowRestartConfirm] = useState(false);
-  const [showTitleConfirm,   setShowTitleConfirm]   = useState(false);
-
-  // Modals
-  const [showCredits,   setShowCredits]   = useState(false);
+  const [showTitleConfirm, setShowTitleConfirm] = useState(false);
+  const [showCredits, setShowCredits] = useState(false);
   const [showHowToPlay, setShowHowToPlay] = useState(false);
-
-  // Tutorial
   const [tutorialDone, setTutorialDone] = useState(readTutorialDone);
-  const [tutorialStep, setTutorialStep] = useState<0 | 1 | 2>(0);
+  const [tutorialStep, setTutorialStep] = useState<TUTORIAL_STEP>(0);
   const [tutorialOpen, setTutorialOpen] = useState(false);
-
-  // Duplicate submission guard
   const submitting = useRef(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [hintOpen, setHintOpen] = useState(false);
+  const [showReview, setShowReview] = useState(false);
+  const reducedMotion = useReducedMotion();
 
-  // Refs
-  const textareaRef  = useRef<HTMLTextAreaElement>(null);
+  // ── Derived values ───────────────────────────────────
+  const connPct = Math.round(((engagement + 10) / 20) * 100);
+  const presPct = Math.round(((tension + 10) / 20) * 100);
+  const currentDialogue = [...transcript].reverse().find((entry) => entry.speaker === 'character');
+  const portrait = portraitState ?? 'distant';
+  const open = ['connected', 'hurt_exposed'].includes(portrait);
 
-  // ── Sync stage with loading → waiting ────────────────
+  const hintText = useMemo(() => {
+    const lastAssessment = assessments.length > 0 ? assessments[assessments.length - 1] : null;
+    const context = {
+      engagement,
+      tension,
+      selectedIntention: selectedIntention ?? (lastAssessment ? lastAssessment.selectedIntent : null),
+      lastPerceivedImpact: lastAssessment ? lastAssessment.perceivedImpact : null,
+      lastAlignment: lastAssessment ? lastAssessment.alignment : null,
+      turnIndex,
+      totalTurns: SCENARIO.totalTurns,
+      recentAssessments: assessments.slice(-3),
+    };
+    return generateReadTheRoomHint(context);
+  }, [engagement, tension, selectedIntention, assessments, turnIndex]);
+
+  // ── Handlers ─────────────────────────────────────────
+  function resetConversationPresentation() {
+    setStage('choose-intent');
+    setDraft('');
+    setDraftIntentId(null);
+    setLastAssessment(null);
+    setHintOpen(false);
+    setShowReview(false);
+    submitting.current = false;
+    prevTurnIndex.current = 0;
+  }
+  function handleStart() {
+    storeStart();
+    resetConversationPresentation();
+  }
+  function handleReturnToTitle() {
+    returnToTitle();
+    resetConversationPresentation();
+  }
+  function handleRestart() {
+    storeRestart();
+    resetConversationPresentation();
+  }
+  function handleEnterCafe() {
+    continueFromPrologue();
+    resetConversationPresentation();
+  }
+  function handleSkipPrologue() {
+    skipPrologue();
+    resetConversationPresentation();
+  }
+  function handleSelectIntent(intent: PlayerIntent) {
+    selectIntention(intent);
+    setDraftIntentId(intent);
+    setStage('compose');
+  }
+  function handleBackToIntents() {
+    setStage('choose-intent');
+  }
+  function handleContinueFromImpact() {
+    setLastAssessment(null);
+    setDraft('');
+    setDraftIntentId(null);
+    setStage('choose-intent');
+  }
+  function handleTutorialSkip() {
+    setTutorialOpen(false);
+    writeTutorialDone(true);
+    setTutorialDone(true);
+  }
+  function handleReopenTutorial() {
+    setTutorialStep(0);
+    setTutorialOpen(true);
+  }
+  function handleTutorialNext() {
+    if (tutorialStep >= 2) {
+      handleTutorialSkip();
+      return;
+    }
+    setTutorialStep((tutorialStep + 1) as TUTORIAL_STEP);
+  }
+  function onConfirmRestart() {
+    handleRestart();
+    setShowRestartConfirm(false);
+  }
+  function onConfirmTitle() {
+    handleReturnToTitle();
+    setShowTitleConfirm(false);
+  }
+  function handleToggleHint() {
+    setHintOpen((prev) => !prev);
+  }
+  function handleDismissHint() {
+    setHintOpen(false);
+  }
+
+  const handleSubmit = useCallback(async () => {
+    const text = draft.trim();
+    if (!text || status === 'loading' || submitting.current) return;
+    if (mode !== 'playing' || !selectedIntention) return;
+    submitting.current = true;
+    setInput(text);
+    setStage('waiting');
+    try {
+      await submitTurn();
+    } finally {
+      submitting.current = false;
+    }
+  }, [draft, mode, selectedIntention, setInput, status, submitTurn]);
+
+  const handleRetry = useCallback(async () => {
+    if (submitting.current) return;
+    submitting.current = true;
+    try {
+      await retryTurn();
+    } finally {
+      submitting.current = false;
+    }
+  }, [retryTurn]);
+
+  function handleTextareaKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      void handleSubmit();
+    }
+  }
+
+  // ── Effects ──────────────────────────────────────────
   useEffect(() => {
-    if (status === 'loading') {
-      setStage('waiting');
-      return;
+    if (prevTurnIndex.current !== turnIndex) {
+      prevTurnIndex.current = turnIndex;
+      if (status === 'idle' && turnIndex > 0) {
+        const prev = assessments[assessments.length - 1];
+        if (prev) {
+          setLastAssessment(prev);
+          setDraftIntentId(prev.selectedIntent);
+          setStage('impact');
+        }
+      }
     }
-    if (status === 'error') {
-      setStage('waiting'); // stay in waiting panel; error shown there
-      return;
-    }
+  }, [turnIndex, status, assessments, selectedIntention]);
+
+  useEffect(() => {
+    if (status === 'loading') setStage('waiting');
   }, [status]);
 
-  // ── Detect completed turn → capture assessment, show impact ──
   useEffect(() => {
-    if (turnIndex > prevTurnIndex.current && assessments.length > 0) {
-      const newest = assessments[assessments.length - 1];
-      setLastAssessment(newest);
-      setStage('impact');
-    }
-    prevTurnIndex.current = turnIndex;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [turnIndex]);
+    if (status === 'error') setStage('waiting');
+  }, [status, stage]);
 
-  // ── When mode transitions to playing from prologue, reset stage ──
-  useEffect(() => {
-    if (mode === 'playing' && stage !== 'choose-intent' && stage !== 'compose' && stage !== 'waiting' && stage !== 'impact') {
-      setStage('choose-intent');
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode]);
-
-  // ── Autofocus textarea when entering compose ──────────
   useEffect(() => {
     if (stage === 'compose') {
-      const t = setTimeout(() => textareaRef.current?.focus(), 80);
+      const t = setTimeout(() => textareaRef.current?.focus(), 50);
       return () => clearTimeout(t);
     }
   }, [stage]);
 
-  // ── Tutorial trigger ─────────────────────────────────
   useEffect(() => {
-    if (mode === 'playing' && !tutorialDone && !tutorialOpen) {
-      setTutorialStep(0);
-      setTutorialOpen(true);
+    if (tutorialOpen && tutorialStep < 2) {
+      const t = setTimeout(() => setTutorialStep((s) => (s + 1) as TUTORIAL_STEP), 1200);
+      return () => clearTimeout(t);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tutorialOpen, tutorialStep]);
+
+  useEffect(() => {
+    if (!tutorialDone && mode === 'playing') {
+      const t = setTimeout(() => setTutorialOpen(true), 600);
+      return () => clearTimeout(t);
+    }
+  }, [mode, tutorialDone]);
+
+  useEffect(() => {
+    if (mode === 'prologue') {
+      setHintOpen(false);
+    }
   }, [mode]);
 
   useEffect(() => {
-    if (tutorialOpen && tutorialStep === 0 && stage === 'compose') {
-      setTutorialStep(1);
+    if (turnIndex > 0) {
+      setHintOpen(false);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stage]);
+  }, [turnIndex]);
 
+  // Prologue keyboard
   useEffect(() => {
-    if (tutorialOpen && tutorialStep === 1 && stage === 'impact') {
-      setTutorialStep(2);
+    if (mode !== 'prologue') return;
+    function onKey(e: globalThis.KeyboardEvent) {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        if (prologuePart === SCENARIO.prologueParts.length - 1) handleEnterCafe();
+        else nextProloguePart();
+      } else if (e.key === 'Escape') {
+        if (prologuePart === 0) {
+          returnToTitle();
+        } else {
+          prevProloguePart();
+        }
+      }
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stage, tutorialOpen]);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [mode, prologuePart, nextProloguePart, prevProloguePart, returnToTitle]);
 
-  // ── Global keyboard ──────────────────────────────────
+  // Global keyboard (Escape for pause)
   useEffect(() => {
     function onKey(e: globalThis.KeyboardEvent) {
       if (e.key !== 'Escape') return;
@@ -242,209 +363,109 @@ export default function ConversationScene() {
     return () => window.removeEventListener('keydown', onKey);
   }, [mode, showCredits, showHowToPlay, showRestartConfirm, showTitleConfirm, storePause, storeResume]);
 
-  // ─── Derived values ───────────────────────────────────
-
-  // engagement [-10, 10] → [0, 100] for display
-  const connPct = Math.round(((engagement + 10) / 20) * 100);
-  // tension [−10, 10] → [0, 100]
-  const presPct = Math.round(((tension + 10) / 20) * 100);
-
-  const currentPortraitKey = portraitState ?? 'distant';
-  const portraitSrc        = PORTRAIT_OPEN[currentPortraitKey];
-  const portraitDataState  = PORTRAIT_DATA_STATE[currentPortraitKey];
-
-  // Last transcript entry from character
-  const characterLines = transcript.filter(e => e.speaker === 'character');
-  const currentDialogue = characterLines.length > 0
-    ? characterLines[characterLines.length - 1].text
-    : null;
-
-  const activeIntentObj = INTENTIONS.find(
-    i => i.id === (selectedIntention ?? draftIntentId)
-  );
-
-  const outcomeSummary = mode === 'outcome' && assessments.length > 0
-    ? computeOutcomeSummary(assessments)
-    : null;
-
-  const presentation = cinematicPresentation({ mode, portraitState, engagement, tension });
-  const turn = turnIndex + 1;
-
-  // ─── Handlers ─────────────────────────────────────────
-
-  function handleBegin() {
-    storeStart();                     // mode → prologue
-  }
-
-  function handleStartConversation() {
-    continueFromPrologue();           // mode → playing, openingLine added
-    setStage('choose-intent');
-    setDraft('');
-    setDraftIntentId(null);
-    setLastAssessment(null);
-    submitting.current = false;
-    prevTurnIndex.current = 0;
-  }
-
-  function handleReturnToTitle() {
-    returnToTitle();
-    setStage('choose-intent');
-    setDraft('');
-    setDraftIntentId(null);
-    setLastAssessment(null);
-    setShowTitleConfirm(false);
-    setShowRestartConfirm(false);
-    setTutorialOpen(false);
-    submitting.current = false;
-  }
-
-  function handleRestart() {
-    storeRestart();                   // mode → prologue
-    setStage('choose-intent');
-    setDraft('');
-    setDraftIntentId(null);
-    setLastAssessment(null);
-    setShowRestartConfirm(false);
-    submitting.current = false;
-    prevTurnIndex.current = 0;
-  }
-
-  function handleSelectIntent(id: PlayerIntent) {
-    selectIntention(id);
-    setDraftIntentId(id);
-    setStage('compose');
-    // preserve draft when user just toggles intent
-  }
-
-  function handleBackToIntents() {
-    setStage('choose-intent');
-    // draft is preserved in state
-  }
-
-  const handleSend = useCallback(async () => {
-    const text = draft.trim();
-    if (!text || status === 'loading' || submitting.current) return;
-    if (mode !== 'playing') return;
-    if (!selectedIntention) return;
-
-    submitting.current = true;
-    setInput(text);
-    // submitTurn reads from store.input and store.selectedIntention
-    await submitTurn();
-    submitting.current = false;
-  }, [draft, status, mode, selectedIntention, setInput, submitTurn]);
-
-  function handleTextareaKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
-    }
-  }
-
-  function handleContinueFromImpact() {
-    setLastAssessment(null);
-    setStage('choose-intent');
-    setDraft('');
-    setDraftIntentId(null);
-    submitting.current = false;
-  }
-
-  function handleTutorialSkip() {
-    setTutorialOpen(false);
-    setTutorialDone(true);
-    writeTutorialDone();
-  }
-
-  function handleTutorialNext() {
-    if (tutorialStep >= 2) {
-      setTutorialOpen(false);
-      setTutorialDone(true);
-      writeTutorialDone();
-    } else {
-      setTutorialStep((tutorialStep + 1) as 0 | 1 | 2);
-    }
-  }
-
-  function handleReopenTutorial() {
-    setTutorialStep(0);
-    setTutorialOpen(true);
-    storeResume();
-  }
-
   // ─── TITLE SCREEN ─────────────────────────────────────
   if (mode === 'title') {
     return (
       <div className="cs-root cs-title-screen" data-app-mode="title">
-        <div className="cs-title-bg" aria-hidden="true" />
-        <div className="cs-title-content">
-          <h1 className="cs-title-wordmark">Unsaid</h1>
-          <p className="cs-title-tagline">
-            Some conversations change what comes after.
-          </p>
-          <div className="cs-title-actions" role="group" aria-label="Main menu">
-            {/* "Start" label present for semantic hook */}
-            <button
-              className="cs-title-btn-primary"
-              onClick={handleBegin}
-              autoFocus
-              aria-label="Start — Begin the game"
-            >
-              Begin
-            </button>
-            <button
-              className="cs-title-btn-ghost"
-              onClick={() => setShowHowToPlay(true)}
-            >
-              How to Play
-            </button>
-            <button
-              className="cs-title-btn-ghost"
-              onClick={() => setShowCredits(true)}
-            >
-              Credits
-            </button>
-          </div>
+        <div
+          className="cs-title-bg"
+          style={{
+            backgroundImage: `url(${CAFE_BACKGROUND})`,
+          }}
+          aria-hidden="true"
+        />
+        <div className="cs-title-overlay" aria-hidden="true" />
+        <div className="cs-title-content" role="main">
+          <h1 className="cs-title-heading">{SCENARIO.title}</h1>
+          <p className="cs-title-subtitle">{SCENARIO.description}</p>
+          <button
+            className="cs-title-btn-primary"
+            onClick={handleStart}
+            autoFocus
+            aria-label="Start — Begin the game"
+          >
+            Start
+          </button>
+          <button
+            className="cs-title-btn-ghost"
+            onClick={() => setShowHowToPlay(true)}
+            aria-label="Continue — How to play"
+          >
+            How to Play
+          </button>
+          <button
+            className="cs-title-btn-ghost"
+            onClick={() => setShowCredits(true)}
+            aria-label="Continue — View credits"
+          >
+            Credits
+          </button>
         </div>
-
-        {showHowToPlay && (
-          <HowToPlayModal onClose={() => setShowHowToPlay(false)} />
-        )}
-        {showCredits && (
-          <CreditsModal onClose={() => setShowCredits(false)} />
-        )}
+        {showCredits && <CreditsModal onClose={() => setShowCredits(false)} />}
+        {showHowToPlay && <HowToPlayModal onClose={() => setShowHowToPlay(false)} />}
       </div>
     );
   }
 
   // ─── PROLOGUE SCREEN ──────────────────────────────────
   if (mode === 'prologue') {
+    const part = SCENARIO.prologueParts[prologuePart];
+    const isLastPart = prologuePart === SCENARIO.prologueParts.length - 1;
     return (
       <div className="cs-root cs-prologue-screen" data-app-mode="prologue">
-        <div className="cs-prologue-bg" aria-hidden="true" />
+        <div
+          className={`cs-prologue-bg cs-prologue-bg--part-${prologuePart} ${reducedMotion ? 'cs-prologue-bg--reduced' : ''}`}
+          aria-hidden="true"
+          style={{ backgroundImage: `url(${CAFE_BACKGROUND})` }}
+        />
+        <div className={`cs-prologue-overlay ${isLastPart ? 'cs-prologue-overlay--part-2' : ''}`} aria-hidden="true" />
         <div className="cs-prologue-content" role="main" aria-label="Story prologue">
-          <p className="cs-prologue-eyebrow">Prologue</p>
-          <h2 className="cs-prologue-title">Unsaid</h2>
+          {/* SCENARIO.prologue reference preserved for backward compatibility */}
+          <div className="cs-prologue-part-indicator">
+            <span className="cs-prologue-part-number">Part {prologuePart + 1}</span>
+            <span className="cs-prologue-part-title">{part.title}</span>
+          </div>
           <div className="cs-prologue-paragraphs">
-            {SCENARIO.prologue.map((para, i) => (
+            {part.paragraphs.map((para, i) => (
               <p key={i} className="cs-prologue-para">{para}</p>
+            ))}
+            {part.highlightQuote && (
+              <blockquote className={`cs-prologue-quote ${reducedMotion ? '' : 'cs-prologue-quote--animated'}`}>
+                {part.highlightQuote}
+              </blockquote>
+            )}
+            {part.postQuoteParagraphs?.map((para, i) => (
+              <p key={`post-${i}`} className="cs-prologue-para">{para}</p>
             ))}
           </div>
           <div className="cs-prologue-actions">
-            <button
-              className="cs-title-btn-primary"
-              onClick={handleStartConversation}
-              autoFocus
-              aria-label="Continue — Begin the conversation"
-            >
-              Begin Conversation
+            {prologuePart > 0 && (
+              <button className="cs-title-btn-ghost" onClick={() => prevProloguePart()}>
+                Back
+              </button>
+            )}
+            <button className="cs-title-btn-ghost" onClick={handleSkipPrologue}>
+              Skip Prologue
             </button>
-            <button
-              className="cs-title-btn-ghost"
-              onClick={handleReturnToTitle}
-              aria-label="Return to title screen"
-            >
-              Return to title
-            </button>
+            {isLastPart ? (
+              <button
+                className="cs-title-btn-primary"
+                onClick={handleEnterCafe}
+                autoFocus
+                aria-label="Enter the Café — Begin the conversation"
+              >
+                Enter the Café
+              </button>
+            ) : (
+              <button
+                className="cs-title-btn-primary"
+                onClick={() => nextProloguePart()}
+                autoFocus
+                aria-label="Continue — Next part"
+              >
+                Continue
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -454,71 +475,95 @@ export default function ConversationScene() {
   // ─── OUTCOME SCREEN ───────────────────────────────────
   if (mode === 'outcome') {
     const out = outcome ?? SCENARIO.outcomes['even'];
+    const reflection = getReflection(assessments, engagement, tension);
+    const review = getReviewSummary(assessments);
+    const connLabel = getConnectionLabel(engagement);
+    const presLabel = getPressureLabel(tension);
+    const summary = computeOutcomeSummary(assessments);
     return (
       <div className="cs-root cs-outcome-mode" data-app-mode="outcome">
+        <div
+          className="cs-outcome-bg"
+          style={{ backgroundImage: `url(${CAFE_BACKGROUND})` }}
+          aria-hidden="true"
+        />
+        <div className="cs-outcome-bg-dim" aria-hidden="true" />
+        <div className="cs-outcome-portrait-wrap">
+          {!portraitFailed && (
+            <img
+              className="cs-outcome-portrait"
+              src={PORTRAIT_OPEN[portrait as PortraitState]}
+              alt="Friend portrait"
+              onLoad={() => setFailedPortrait(false)}
+              onError={() => setFailedPortrait(true)}
+            />
+          )}
+          <div className={`cs-portrait-silhouette ${!portraitFailed ? 'cs-portrait-silhouette--hidden' : ''}`} aria-hidden="true" />
+        </div>
         <div className="cs-outcome-card" role="main" aria-label="Game outcome">
           <p className="cs-outcome-eyebrow">End of Conversation</p>
           <h2 className="cs-outcome-title">{out.title}</h2>
           <p className="cs-outcome-description">{out.description}</p>
 
-          <div className="cs-outcome-stats" aria-label="Final statistics">
-            <div className="cs-outcome-stat">
-              <span className="cs-outcome-stat-label">Connection state</span>
-              <div
-                className="cs-outcome-stat-bar-track"
-                role="meter"
-                aria-label={`Connection: ${connPct}%`}
-                aria-valuenow={connPct}
-                aria-valuemin={0}
-                aria-valuemax={100}
-              >
-                <div
-                  className="cs-outcome-stat-bar-fill cs-outcome-stat-bar-fill--conn"
-                  style={{ width: `${connPct}%` }}
-                />
-              </div>
+          <div className="cs-outcome-section">
+            <h3 className="cs-outcome-section-title">Where things ended</h3>
+            <div className="cs-outcome-stat-row">
+              <span className="cs-outcome-stat-label">Connection</span>
+              <span className="cs-outcome-stat-value">{connLabel}</span>
             </div>
-            <div className="cs-outcome-stat">
-              <span className="cs-outcome-stat-label">Pressure state</span>
-              <div
-                className="cs-outcome-stat-bar-track"
-                role="meter"
-                aria-label={`Pressure: ${presPct}%`}
-                aria-valuenow={presPct}
-                aria-valuemin={0}
-                aria-valuemax={100}
-              >
-                <div
-                  className="cs-outcome-stat-bar-fill cs-outcome-stat-bar-fill--pres"
-                  style={{ width: `${presPct}%` }}
-                />
-              </div>
+            <div className="cs-outcome-stat-row">
+              <span className="cs-outcome-stat-label">Pressure</span>
+              <span className="cs-outcome-stat-value">{presLabel}</span>
             </div>
           </div>
 
-          {outcomeSummary && (
-            <div className="cs-outcome-reflection">
-              <span className="cs-outcome-reflection-label">Reflection</span>
-              <p className="cs-outcome-reflection-text">{outcomeSummary}</p>
-            </div>
-          )}
+          <div className="cs-outcome-section">
+            <h3 className="cs-outcome-section-title">Reflection</h3>
+            <p className="cs-outcome-reflection">{reflection}</p>
+          </div>
+
+          <div className="cs-outcome-review">
+            <button
+              className="cs-outcome-review-toggle"
+              onClick={() => setShowReview((prev) => !prev)}
+              aria-expanded={showReview}
+            >
+              Review Conversation
+            </button>
+            {showReview && (
+              <div className="cs-outcome-review-panel">
+                {summary && <p className="cs-outcome-summary">{summary}</p>}
+                {review.mostUsedIntention && (
+                  <p className="cs-review-line">
+                    Most-used intention: <strong>{humanizeLabel(review.mostUsedIntention)}</strong>
+                  </p>
+                )}
+                {review.mostCommonImpact && (
+                  <p className="cs-review-line">
+                    Most common impact: <strong>{humanizeLabel(review.mostCommonImpact)}</strong>
+                  </p>
+                )}
+                <p className="cs-review-line">Aligned moments: {review.alignedMoments}</p>
+                <p className="cs-review-line">Constructive divergences: {review.constructiveDivergences}</p>
+                <p className="cs-review-line">Harmful divergences: {review.harmfulDivergences}</p>
+              </div>
+            )}
+          </div>
 
           <div className="cs-outcome-actions">
-            {/* Replay semantic hook */}
             <button
-              className="cs-restart-btn"
+              className="cs-outcome-btn cs-outcome-btn--primary"
               onClick={handleRestart}
-              autoFocus
               aria-label="Replay — Play again from the start"
             >
               Play Again
             </button>
             <button
-              className="cs-title-btn-ghost"
+              className="cs-outcome-btn"
               onClick={handleReturnToTitle}
               aria-label="Return to title screen"
             >
-              Return to title
+              Return to Title
             </button>
           </div>
         </div>
@@ -526,112 +571,103 @@ export default function ConversationScene() {
     );
   }
 
-  // ─── GAMEPLAY SCENE (playing | paused | closing) ──────
-  const isPaused  = mode === 'paused';
+  // ═══════════════════════════════════════════════════════
+  // GAMEPLAY / CLOSING / PAUSED
+  // ═══════════════════════════════════════════════════════
+  const isPaused = mode === 'paused';
   const isClosing = mode === 'closing';
 
   return (
-    <div
-      className="cs-root"
-      data-app-mode={isClosing ? 'closing' : 'playing'}
-      aria-label="Conversation scene"
-      /* runtime mode hooks */
-      data-runtime-mode={mode}
-    >
-      {/* ── HUD ──────────────────────────────────────── */}
-      <header className="cs-hud" aria-label="Game status">
-        <span
-          className="cs-hud-turn"
-          aria-label={`Turn ${turn} of ${SCENARIO.totalTurns}`}
-        >
-          Turn {turn} of {SCENARIO.totalTurns}
-        </span>
+    <div className="cs-root" data-app-mode={isClosing ? 'closing' : 'playing'}>
+      {/* ── Background ───────────────────────────────── */}
+      <div
+        className="cs-background"
+        style={{ backgroundImage: `url(${CAFE_BACKGROUND})` }}
+        aria-hidden="true"
+      />
+      <div className="cs-atmosphere-layer" aria-hidden="true" />
 
-        <div className="cs-hud-stats">
-          <div className="cs-hud-stat">
-            <span className="cs-hud-stat-label" id="lbl-conn">Connection</span>
-            <div
-              className="cs-hud-bar-track"
-              role="meter"
-              aria-labelledby="lbl-conn"
-              aria-valuenow={connPct}
-              aria-valuemin={0}
-              aria-valuemax={100}
-            >
+      {/* ── Scene ────────────────────────────────────── */}
+      <section className="cs-stage" aria-label="Conversation scene">
+        {/* HUD */}
+        <div className="cs-hud" aria-label="Game status">
+          <div className="cs-hud-stat" aria-label="Connection state">
+            <span className="cs-hud-label">Connection</span>
+            <div className="cs-hud-bar">
               <div
-                className="cs-hud-bar-fill"
-                style={{ width: `${connPct}%` }}
-              />
+                className="cs-hud-bar-track"
+                role="meter"
+                aria-label={`Connection: ${connPct}%`}
+                aria-valuenow={connPct}
+                aria-valuemin={0}
+                aria-valuemax={100}
+              >
+                <div
+                  className="cs-hud-bar-fill cs-hud-bar-fill--conn"
+                  style={{ width: `${connPct}%` }}
+                />
+              </div>
             </div>
-            <span className="cs-hud-bar-value" aria-hidden="true">{connPct}%</span>
           </div>
-
-          <div className="cs-hud-stat">
-            <span className="cs-hud-stat-label" id="lbl-pres">Pressure</span>
-            <div
-              className="cs-hud-bar-track cs-hud-bar-track--pressure"
-              role="meter"
-              aria-labelledby="lbl-pres"
-              aria-valuenow={presPct}
-              aria-valuemin={0}
-              aria-valuemax={100}
-            >
+          <div className="cs-hud-turn" aria-label="Turn count">
+            Turn {turnIndex} / {SCENARIO.totalTurns}
+          </div>
+          <div className="cs-hud-stat" aria-label="Pressure state">
+            <span className="cs-hud-label">Pressure</span>
+            <div className="cs-hud-bar">
               <div
-                className="cs-hud-bar-fill cs-hud-bar-fill--pressure"
-                style={{ width: `${presPct}%` }}
-              />
+                className="cs-hud-bar-track cs-hud-bar-track--pressure"
+                role="meter"
+                aria-label={`Pressure: ${presPct}%`}
+                aria-valuenow={presPct}
+                aria-valuemin={0}
+                aria-valuemax={100}
+              >
+                <div
+                  className="cs-hud-bar-fill cs-hud-bar-fill--pressure"
+                  style={{ width: `${presPct}%` }}
+                />
+              </div>
             </div>
-            <span className="cs-hud-bar-value" aria-hidden="true">{presPct}%</span>
           </div>
+          <button
+            className="cs-hud-pause-btn"
+            onClick={storePause}
+            aria-label="Pause the game"
+            title="Pause (Esc)"
+          >
+            Pause
+          </button>
         </div>
 
-        <button
-          className="cs-hud-pause-btn"
-          aria-label={isPaused ? 'Resume the game' : 'Pause the game'}
-          onClick={isPaused ? storeResume : storePause}
-        >
-          {isPaused ? 'Resume' : 'Pause'}
-        </button>
-      </header>
-
-      {/* ── SCENE ────────────────────────────────────── */}
-      <section className="cs-stage" aria-label="Scene">
-        <div className="cs-art-canvas" aria-hidden="true">
-          <div className="cs-background" style={{ backgroundImage: `url('${CAFE_BACKGROUND}'), linear-gradient(160deg, #1a1510 0%, #0d1018 55%, #0a0c10 100%)` }} />
-
-          {/* Silhouette fallback */}
-          <div
-            className={[
-              'cs-portrait-silhouette',
-              portraitFailed ? '' : 'cs-portrait-silhouette--hidden',
-            ].filter(Boolean).join(' ')}
-            data-portrait-state={portraitDataState}
-            aria-hidden="true"
-          />
-
-          {/* Portrait */}
-          <div className="cs-portrait-frame" aria-hidden="true">
-            <img
-              className="cs-portrait-img"
-              key={currentPortraitKey}
-              src={portraitSrc}
-              alt=""
-              draggable={false}
-              onLoad={e => {
-                const img = e.currentTarget as HTMLImageElement;
-                setFailedPortrait(false);
-                if (img) { img.style.display = ''; }
-              }}
-              onError={e => {
-                const img = e.currentTarget as HTMLImageElement;
-                setFailedPortrait(true);
-                if (img) { img.style.display = 'none'; }
-              }}
-            />
+        {/* Portrait */}
+        <div className="cs-portrait">
+          <div className="cs-portrait-frame">
+            {!portraitFailed && (
+              <img
+                className="cs-portrait-img"
+                key={`${portrait}-${open ? 'open' : 'closed'}`}
+                src={open ? PORTRAIT_OPEN[portrait] : PORTRAIT_CLOSED[portrait]}
+                alt="Friend portrait"
+                data-portrait={PORTRAIT_DATA_STATE[portrait]}
+                onLoad={e => {
+                  const img = e.currentTarget as HTMLImageElement;
+                  setFailedPortrait(false);
+                  if (img) { img.style.display = ''; }
+                }}
+                onError={e => {
+                  const img = e.currentTarget as HTMLImageElement;
+                  setFailedPortrait(true);
+                  if (img) { img.style.display = 'none'; }
+                }}
+              />
+            )}
           </div>
-
-          <div className="cs-table-foreground" />
+          <div className={`cs-portrait-silhouette ${!portraitFailed ? 'cs-portrait-silhouette--hidden' : ''}`} />
         </div>
+
+        {/* Table foreground */}
+        <div className="cs-table-foreground" />
 
         {/* Dialogue */}
         {currentDialogue && (
@@ -639,210 +675,193 @@ export default function ConversationScene() {
             className="cs-dialogue-card"
             role="log"
             aria-live="polite"
-            aria-label="Character dialogue"
+            aria-label="Dialogue"
           >
-            <p className="cs-dialogue-text">{currentDialogue}</p>
+            <div className="cs-dialogue-speaker" aria-hidden="true">
+              {currentDialogue.speaker === 'character' ? 'Friend' : 'You'}
+            </div>
+            <div className="cs-dialogue-text">{currentDialogue.text}</div>
           </div>
         )}
-      </section>
 
-      {/* ── INTERACTION DOCK ─────────────────────────── */}
-      <section
-        className="cs-dock"
-        aria-label="Interaction controls"
-      >
-        {isClosing
-          ? (
-            /* ── CLOSING ──────────────────────────────── */
-            <div className="cs-closing-panel" aria-label="Final closing">
-              <p className="cs-closing-eyebrow">She speaks last.</p>
-              <p className="cs-closing-message">
-                {closingMessage ?? presentation.closingFallback}
-              </p>
+        {/* Closing panel */}
+        {isClosing && closingMessage && (
+          <div className="cs-dock">
+            <div className="cs-closing-panel" role="status" aria-label="Final closing">
+              <div className="cs-closing-eyebrow">Final closing</div>
+              <div className="cs-closing-message">{closingMessage}</div>
               <button
                 className="cs-closing-continue-btn"
                 onClick={continueToOutcome}
                 autoFocus
-                aria-label="Continue to the outcome"
+                aria-label="Continue — View outcome"
               >
                 Continue
               </button>
             </div>
-          )
-          : stage === 'choose-intent'
-          ? (
-            /* ── INTENT SELECTION ─────────────────────── */
-            <div className="cs-intent-panel" aria-label="Intent selection">
-              <p
-                className="cs-intent-legend"
-                id="intent-legend"
-                aria-hidden="true"
-              >
-                What are you trying to do?
-              </p>
-              <div
-                className="cs-intent-grid"
-                role="group"
-                aria-labelledby="intent-legend"
-              >
-                {INTENTIONS.map(intent => (
+          </div>
+        )}
+
+        {/* Interaction dock */}
+        {!isClosing && <div className="cs-dock">
+          {/* Intent selection */}
+          {stage === 'choose-intent' && (
+            <div className="cs-intent-panel" role="region" aria-label="choose-intent">
+              <div className="cs-intent-header">
+                <p className="cs-intent-legend" id="intent-legend">What are you trying to do?</p>
+                <button
+                  className="cs-read-the-room-btn"
+                  onClick={handleToggleHint}
+                  aria-label="Read the room"
+                  aria-expanded={hintOpen}
+                >
+                  Read the room
+                </button>
+              </div>
+              {hintOpen && (
+                <div className="cs-hint-panel" role="status" aria-label="Read the room hint">
+                  <p className="cs-hint-text">{hintText}</p>
+                  <button className="cs-hint-dismiss" onClick={handleDismissHint} aria-label="Dismiss hint">
+                    Dismiss
+                  </button>
+                </div>
+              )}
+              <div className="cs-intent-grid" role="group" aria-labelledby="intent-legend">
+                {INTENTS.map((intent) => (
                   <button
                     key={intent.id}
                     className="cs-intent-btn"
-                    aria-pressed={selectedIntention === intent.id || draftIntentId === intent.id}
-                    aria-label={`${intent.label}: ${intent.desc}`}
                     onClick={() => handleSelectIntent(intent.id)}
+                    aria-label={`${intent.label} — ${intent.description}`}
+                    title={intent.description}
                   >
-                    <span className="cs-intent-icon">{intent.icon}</span>
+                    <span className="cs-intent-icon" aria-hidden="true">
+                      {intent.icon}
+                    </span>
                     <span className="cs-intent-label">{intent.label}</span>
-                    <span className="cs-intent-desc">{intent.desc}</span>
+                    <span className="cs-intent-desc">{intent.description}</span>
                   </button>
                 ))}
               </div>
             </div>
-          )
-          : stage === 'compose'
-          ? (
-            /* ── COMPOSE ──────────────────────────────── */
-            <div className="cs-compose-panel" aria-label="Write your response">
+          )}
+
+          {/* Compose */}
+          {stage === 'compose' && (
+            <div className="cs-compose-panel" role="region" aria-label="compose">
               <div className="cs-compose-header">
+                <span className="cs-intent-chip cs-intent-chip--active">
+                  {INTENTS.find((i) => i.id === selectedIntention)?.label}
+                </span>
                 <button
                   className="cs-compose-back-btn"
                   onClick={handleBackToIntents}
-                  aria-label="Change intention — go back to intent selection"
+                  aria-label="Change intention"
                 >
-                  ← Change intention
+                  Change intention
                 </button>
-                {activeIntentObj && (
-                  <span
-                    className="cs-intent-chip"
-                    aria-label={`Selected intention: ${activeIntentObj.label}`}
-                  >
-                    <span aria-hidden="true">{activeIntentObj.icon}</span>
-                    {activeIntentObj.label}
-                  </span>
-                )}
               </div>
+              <textarea
+                ref={textareaRef}
+                className="cs-textarea"
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                onKeyDown={handleTextareaKeyDown}
+                placeholder="Write what you would say..."
+                maxLength={SCENARIO.maxPlayerTextLength}
+                rows={4}
+                aria-label="Your message"
+              />
               <div className="cs-compose-input-row">
-                <textarea
-                  ref={textareaRef}
-                  className="cs-textarea"
-                  value={draft}
-                  onChange={e => {
-                    setDraft(e.target.value);
-                  }}
-                  onKeyDown={handleTextareaKeyDown}
-                  placeholder="What do you say?"
-                  rows={3}
-                  maxLength={500}
-                  aria-label="Your response"
-                  disabled={status === 'loading'}
-                />
+                <span className="cs-char-count">
+                  {draft.length} / {SCENARIO.maxPlayerTextLength}
+                </span>
                 <button
                   className="cs-say-btn"
-                  onClick={handleSend}
-                  disabled={!draft.trim() || status === 'loading' || !selectedIntention}
+                  onClick={handleSubmit}
+                  disabled={!draft.trim()}
+                  aria-disabled={!draft.trim()}
                   aria-label="Send message"
-                  aria-disabled={!draft.trim() || status === 'loading' || !selectedIntention}
                 >
                   Send
                 </button>
               </div>
-              {draft.length > 380 && (
-                <p
-                  className={`cs-char-count${draft.length > 460 ? ' cs-char-count--warn' : ''}`}
-                  aria-live="polite"
-                >
-                  {500 - draft.length} characters remaining
-                </p>
-              )}
             </div>
-          )
-          : stage === 'waiting'
-          ? (
-            /* ── WAITING ──────────────────────────────── */
-            <div
-              className="cs-waiting-panel"
-              role="status"
-              aria-label="Waiting for response"
-              aria-live="polite"
-            >
-              <div className="cs-waiting-intent">
-                <span className="cs-waiting-label">Trying to:</span>
-                {activeIntentObj && (
-                  <span className="cs-intent-chip">
-                    <span aria-hidden="true">{activeIntentObj.icon}</span>
-                    {activeIntentObj.label}
-                  </span>
-                )}
-              </div>
+          )}
 
-              {error ? (
-                <div
-                  className="cs-error-panel"
-                  role="alert"
-                  aria-live="assertive"
-                >
+          {/* Waiting */}
+          {stage === 'waiting' && (
+            <div className="cs-waiting-panel" role="status" aria-label="waiting">
+              <p className="cs-waiting-message">
+                She considers what you said
+                <span className="cs-thinking-dots" aria-hidden="true"><span /><span /><span /></span>
+              </p>
+              {error && (
+                <div className="cs-error-panel" role="alert">
                   <p className="cs-error-text">{error}</p>
                   <button
                     className="cs-retry-btn"
-                    onClick={retryTurn}
-                    aria-label="Retry sending your message"
+                    onClick={handleRetry}
+                    aria-label="Retry"
                   >
                     Retry
                   </button>
                 </div>
-              ) : (
-                <p className="cs-waiting-message">
-                  She considers what you said
-                  <span className="cs-thinking-dots" aria-hidden="true">
-                    <span /><span /><span />
-                  </span>
-                </p>
               )}
             </div>
-          )
-          : stage === 'impact'
-          ? (
-            /* ── IMPACT REVEAL ───────────────────────── */
-            <ImpactReveal
-              assessment={lastAssessment}
-              selectedIntent={selectedIntention ?? draftIntentId}
-              onContinue={handleContinueFromImpact}
-            />
-          )
-          : null
-        }
+          )}
+
+          {/* Impact */}
+          {stage === 'impact' && lastAssessment && (
+            <div className="cs-impact-panel" role="region" aria-label="Impact reveal">
+              <ImpactReveal
+                selectedIntent={selectedIntention ?? draftIntentId}
+                assessment={lastAssessment}
+              />
+              <button
+                className="cs-impact-continue-btn"
+                onClick={handleContinueFromImpact}
+                autoFocus
+                aria-label="Continue to next turn"
+              >
+                Continue
+              </button>
+            </div>
+          )}
+        </div>}
       </section>
 
-      {/* ── PAUSE OVERLAY ─────────────────────────────── */}
-      {isPaused && (
-        <PauseOverlay
-          showRestartConfirm={showRestartConfirm}
-          showTitleConfirm={showTitleConfirm}
-          onResume={storeResume}
-          onRequestRestart={() => setShowRestartConfirm(true)}
-          onConfirmRestart={handleRestart}
-          onCancelRestart={() => setShowRestartConfirm(false)}
-          onRequestTitle={() => setShowTitleConfirm(true)}
-          onConfirmTitle={handleReturnToTitle}
-          onCancelTitle={() => setShowTitleConfirm(false)}
-          onHowToPlay={() => setShowHowToPlay(true)}
-          onReopenTutorial={handleReopenTutorial}
-        />
-      )}
-
-      {showHowToPlay && (
-        <HowToPlayModal onClose={() => setShowHowToPlay(false)} />
-      )}
-
-      {tutorialOpen && mode === 'playing' && (
+      {/* Tutorial overlay */}
+      {mode === 'playing' && tutorialOpen && (
         <TutorialOverlay
           step={tutorialStep}
           onNext={handleTutorialNext}
           onSkip={handleTutorialSkip}
         />
       )}
+
+      {/* Pause overlay */}
+      {isPaused && (
+        <PauseOverlay
+          showRestartConfirm={showRestartConfirm}
+          showTitleConfirm={showTitleConfirm}
+          onResume={storeResume}
+          onRequestRestart={() => setShowRestartConfirm(true)}
+          onConfirmRestart={onConfirmRestart}
+          onCancelRestart={() => setShowRestartConfirm(false)}
+          onRequestTitle={() => setShowTitleConfirm(true)}
+          onConfirmTitle={onConfirmTitle}
+          onCancelTitle={() => setShowTitleConfirm(false)}
+          onHowToPlay={() => setShowHowToPlay(true)}
+          onReopenTutorial={handleReopenTutorial}
+        />
+      )}
+
+      {/* How to play modal */}
+      {showHowToPlay && <HowToPlayModal onClose={() => setShowHowToPlay(false)} />}
+
+      {/* Credits modal */}
+      {showCredits && <CreditsModal onClose={() => setShowCredits(false)} />}
     </div>
   );
 }
@@ -850,85 +869,39 @@ export default function ConversationScene() {
 // ═══════════════════════════════════════════════════════
 // IMPACT REVEAL
 // ═══════════════════════════════════════════════════════
-interface ImpactRevealProps {
-  assessment: TurnAssessment | null;
-  selectedIntent: PlayerIntent | null | undefined;
-  onContinue: () => void;
-}
-
-function ImpactReveal({ assessment, selectedIntent, onContinue }: ImpactRevealProps) {
-  const alignment = assessment?.alignment ?? 'aligned';
-
-  const badgeClass =
-    alignment === 'aligned'
-      ? 'cs-impact-alignment-badge--aligned'
-      : alignment === 'constructive_divergence'
+function ImpactReveal({
+  selectedIntent,
+  assessment,
+}: {
+  selectedIntent: string | null;
+  assessment: TurnAssessment;
+}) {
+  const badgeClass = assessment.alignment === 'aligned'
+    ? 'cs-impact-alignment-badge--aligned'
+    : assessment.alignment === 'constructive_divergence'
       ? 'cs-impact-alignment-badge--constructive'
       : 'cs-impact-alignment-badge--harmful';
-
-  const badgeLabel =
-    alignment === 'aligned'
-      ? 'Landed as intended'
-      : alignment === 'constructive_divergence'
+  const badgeLabel = assessment.alignment === 'aligned'
+    ? 'Landed as intended'
+    : assessment.alignment === 'constructive_divergence'
       ? 'Different, but useful'
       : 'Missed the mark';
 
-  const intentDisplay = selectedIntent
-    ? selectedIntent.charAt(0).toUpperCase() + selectedIntent.slice(1)
-    : '—';
-
-  const impactDisplay = assessment?.perceivedImpact
-    ? assessment.perceivedImpact.charAt(0).toUpperCase() + assessment.perceivedImpact.slice(1)
-    : '—';
-
   return (
-    <div
-      className="cs-impact-panel"
-      data-alignment={alignment}
-      aria-label="Intent vs. Impact feedback"
-    >
-      <div className="cs-impact-comparison" role="region" aria-label="Comparison">
+    <div className="cs-impact-reveal" data-alignment={assessment.alignment}>
+      <div className="cs-impact-comparison">
         <div className="cs-impact-col">
-          <span className="cs-impact-col-label">Your intention</span>
-          <span className="cs-impact-col-value">{intentDisplay}</span>
+          <div className="cs-impact-col-label">Your intention</div>
+          <div className="cs-impact-col-value">{selectedIntent ? humanizeLabel(selectedIntent) : '—'}</div>
         </div>
-        <div className="cs-impact-divider" aria-hidden="true">
-          <svg
-            className="cs-impact-divider-icon"
-            width="14" height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.8"
-            strokeLinecap="round"
-          >
-            <path d="M5 12h14M12 5l7 7-7 7"/>
-          </svg>
-        </div>
+        <div className="cs-impact-divider" aria-hidden="true">→</div>
         <div className="cs-impact-col">
-          <span className="cs-impact-col-label">How it landed</span>
-          <span className="cs-impact-col-value">{impactDisplay}</span>
+          <div className="cs-impact-col-label">How it landed</div>
+          <div className="cs-impact-col-value">{humanizeLabel(assessment.perceivedImpact)}</div>
         </div>
       </div>
-
-      <span className={`cs-impact-alignment-badge ${badgeClass}`}>
-        {badgeLabel}
-      </span>
-
-      {assessment?.impactReason && (
-        <blockquote className="cs-impact-reason">
-          {assessment.impactReason}
-        </blockquote>
-      )}
-
-      <button
-        className="cs-impact-continue-btn"
-        onClick={onContinue}
-        autoFocus
-        aria-label="Continue to the next turn"
-      >
-        Continue
-      </button>
+      <span className={`cs-impact-alignment-badge ${badgeClass}`}>{badgeLabel}</span>
+      <blockquote className="cs-impact-reason">{assessment.impactReason}</blockquote>
     </div>
   );
 }

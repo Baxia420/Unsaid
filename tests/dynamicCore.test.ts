@@ -12,10 +12,19 @@ describe('dynamic gameplay contract', () => {
   it('allows exactly 15 committed turns', () => expect(SCENARIO.totalTurns).toBe(15));
   it('owns the prologue in scenario data', () => {
     expect(SCENARIO.prologue.join(' ')).toContain('nine years');
-    expect(SCENARIO.prologue.join(' ')).toContain('important public event');
+    expect(SCENARIO.prologue.join(' ')).toContain('first public photography exhibition');
   });
   it('contains all fixed facts', () => {
-    expect(SCENARIO.facts).toEqual(expect.arrayContaining(['limited invitation', 'broken promise', 'false excuse', 'waiting at the door', 'three weeks of silence']));
+    expect(SCENARIO.facts).toEqual(expect.arrayContaining([
+      'first public photography exhibition',
+      'six invited guests',
+      'the player helped choose the displayed photographs',
+      'the player repeatedly promised to attend',
+      'the player forgot and remembered after the exhibition began',
+      'the player stayed away out of shame rather than arriving late',
+      'the player lied that "Something came up."',
+      'three weeks of silence',
+    ]));
   });
   it('has no mandatory per-turn story script', () => {
     expect(SCENARIO).not.toHaveProperty('beats');
@@ -41,8 +50,9 @@ describe('dynamic production prompt', () => {
   const prompt = buildLivePrompt(request);
 
   it.each([
-    'nine years', 'important public event', 'promised to attend', 'falsely said',
-    'checked the door', 'weeks of silence', 'café',
+    'nine-year friendship', 'first public photography exhibition', 'six invited guests',
+    'helped choose', 'repeatedly promised', 'remembered after', 'stayed away out of shame',
+    'Something came up', 'three weeks of silence', 'café',
   ])('includes fixed fact: %s', (fact) => expect(prompt.system).toContain(fact));
   it('passes the complete transcript', () => {
     expect(prompt.user).toContain('First line.');
@@ -57,6 +67,7 @@ describe('dynamic production prompt', () => {
   it.each([
     'turn number', 'facts surface naturally', 'early', 'late recovery',
     'regression', 'failure', 'Do not require keywords', 'automatically forgive',
+    'resolved', 'recovery is possible',
   ])('includes dynamic safeguard: %s', (rule) => {
     expect(prompt.system.toLowerCase()).toContain(rule.toLowerCase());
   });
