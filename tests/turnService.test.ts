@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { processTurn } from '../server/turn/service';
+import { RecordedModelAdapter } from '../server/adapters/RecordedModelAdapter';
 import { MockModelAdapter } from '../server/adapters/MockModelAdapter';
 import { TurnRequest } from '../src/game/types';
 import { ModelAdapter } from '../server/adapters/ModelAdapter';
@@ -42,6 +43,28 @@ describe('processTurn', () => {
     expect(response.assessment.intent).toBe('unclear');
     expect(response.assessment.engagementDelta).toBe(0);
     expect(response.assessment.tensionDelta).toBe(0);
+  });
+
+  it('recovers malformed live output through the recorded adapter', async () => {
+    const response = await processTurn(
+      baseRequest('I am sorry I let you down.'),
+      new MockModelAdapter('malformed'),
+      new RecordedModelAdapter()
+    );
+
+    expect(response.assessment.intent).toBe('repair');
+    expect(response.characterText).toContain('I hear the apology');
+  });
+
+  it('recovers a thrown live inference error through the recorded adapter', async () => {
+    const response = await processTurn(
+      baseRequest('It was not a big deal.'),
+      new MockModelAdapter('error'),
+      new RecordedModelAdapter()
+    );
+
+    expect(response.assessment.intent).toBe('minimize');
+    expect(response.characterText).toContain('watching the door');
   });
 
   it('derives portrait state from code after a valid turn', async () => {

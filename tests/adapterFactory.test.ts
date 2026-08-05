@@ -1,7 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { createModelAdapter } from '../server/adapters/factory';
+import {
+  createModelAdapter,
+  createRecoveryAdapter,
+  getRuntimeMode,
+} from '../server/adapters/factory';
 import { MockModelAdapter } from '../server/adapters/MockModelAdapter';
 import { GeminiModelAdapter } from '../server/adapters/GeminiModelAdapter';
+import { RecordedModelAdapter } from '../server/adapters/RecordedModelAdapter';
 
 describe('createModelAdapter', () => {
   const originalEnv = process.env;
@@ -33,26 +38,35 @@ describe('createModelAdapter', () => {
     process.env.GEMINI_API_KEY = 'test-key-123';
     const adapter = createModelAdapter();
     expect(adapter).toBeInstanceOf(GeminiModelAdapter);
+    expect(createRecoveryAdapter()).toBeInstanceOf(RecordedModelAdapter);
+    expect(getRuntimeMode()).toBe('live');
   });
 
-  it('falls back to mock with warning when live mode has missing key', () => {
+  it('selects explicit recorded demo mode', () => {
+    process.env.UNSAID_AI_MODE = 'recorded';
+    expect(createModelAdapter()).toBeInstanceOf(RecordedModelAdapter);
+    expect(getRuntimeMode()).toBe('recorded');
+  });
+
+  it('falls back to recorded with warning when live mode has missing key', () => {
     process.env.UNSAID_AI_MODE = 'live';
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const adapter = createModelAdapter();
-    expect(adapter).toBeInstanceOf(MockModelAdapter);
+    expect(adapter).toBeInstanceOf(RecordedModelAdapter);
     expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining('Falling back to mock adapter')
+      expect.stringContaining('Falling back to recorded adapter')
     );
+    expect(getRuntimeMode()).toBe('recorded');
   });
 
-  it('falls back to mock with warning when live mode has blank key', () => {
+  it('falls back to recorded with warning when live mode has blank key', () => {
     process.env.UNSAID_AI_MODE = 'live';
     process.env.GEMINI_API_KEY = '   ';
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const adapter = createModelAdapter();
-    expect(adapter).toBeInstanceOf(MockModelAdapter);
+    expect(adapter).toBeInstanceOf(RecordedModelAdapter);
     expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining('Falling back to mock adapter')
+      expect.stringContaining('Falling back to recorded adapter')
     );
   });
 });

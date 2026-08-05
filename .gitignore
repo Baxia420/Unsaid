@@ -6,3 +6,8 @@ coverage/
 !.env.example
 *.log
 .DS_Store
+eval-*.txt
+test-output.txt
+prompt-info.txt
+scratch/
+

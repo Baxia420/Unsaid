@@ -16,7 +16,7 @@
  * No Testing Library, jest-dom, jsdom, Playwright, or Cypress.
  */
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import { resolve } from 'path';
 import type { PortraitState } from '../src/game/types';
 import {
@@ -25,7 +25,6 @@ import {
   BLINK_SRC,
   PORTRAIT_DATA_STATE,
   CAFE_BACKGROUND,
-  TABLE_FOREGROUND,
 } from '../src/components/cinematicPresentation';
 import type { VisualSceneState } from '../src/components/cinematicPresentation';
 
@@ -44,6 +43,7 @@ const HELPER_SRC = readFileSync(
   resolve(ROOT, 'src/components/cinematicPresentation.ts'),
   'utf-8'
 );
+const PUBLIC_ASSETS = resolve(ROOT, 'public/assets');
 
 // ── Portrait mapping tests ───────────────────────────────────────────────────
 
@@ -79,13 +79,22 @@ describe('Portrait asset mappings', () => {
 // ── Scene asset paths ────────────────────────────────────────────────────────
 
 describe('Scene asset paths', () => {
+  it('ships all mapped portrait assets at the final runtime paths', () => {
+    for (const state of ['distant', 'defensive', 'hurt_exposed', 'connected'] as const) {
+      expect(existsSync(resolve(PUBLIC_ASSETS, 'friend', `${state}-open.webp`))).toBe(true);
+      expect(existsSync(resolve(PUBLIC_ASSETS, 'friend', `${state}-closed.webp`))).toBe(true);
+    }
+    expect(existsSync(resolve(PUBLIC_ASSETS, 'friend', 'blink.webp'))).toBe(true);
+  });
+
   it('cafe background path is root-relative', () => {
     expect(CAFE_BACKGROUND).toBe('/assets/cafe/cafe-window-afternoon.webp');
   });
 
-  it('table foreground path is root-relative', () => {
-    expect(TABLE_FOREGROUND).toBe('/assets/cafe/table-foreground.webp');
+  it('ships the café background at its final runtime path', () => {
+    expect(existsSync(resolve(PUBLIC_ASSETS, 'cafe', 'cafe-window-afternoon.webp'))).toBe(true);
   });
+
 });
 
 // ── Scene-mode strings ───────────────────────────────────────────────────────
@@ -118,8 +127,8 @@ describe('Expected asset path conventions', () => {
     expect(CSS_SRC).toContain("url('/assets/cafe/cafe-window-afternoon.webp')");
   });
 
-  it('CSS contains active table foreground-image declaration', () => {
-    expect(CSS_SRC).toContain("url('/assets/cafe/table-foreground.webp')");
+  it('CSS does not request the unused opaque table composition', () => {
+    expect(CSS_SRC).not.toContain('table-foreground.webp');
   });
 
   // Verify helper (shared source of truth) contains portrait paths
@@ -160,13 +169,19 @@ describe('Portrait image display behaviour', () => {
     expect(CSS_SRC).not.toMatch(/\.cs-portrait-img\s*\{[^}]*display:\s*none/);
   });
 
-  it('component has onError handler on portrait images', () => {
-    expect(COMPONENT_SRC).toContain('onError={handleImgError}');
+  it('component has portrait error handling', () => {
+    expect(COMPONENT_SRC).toContain('onError={handlePortraitError}');
   });
 
   it('handleImgError hides the failed image only', () => {
     expect(COMPONENT_SRC).toContain('e.currentTarget.style.display');
     expect(COMPONENT_SRC).toContain("'none'");
+  });
+
+  it('hides the silhouette only after the active portrait state loads', () => {
+    expect(COMPONENT_SRC).toContain('handlePortraitLoad(portraitState)');
+    expect(COMPONENT_SRC).toContain('cs-portrait-silhouette--hidden');
+    expect(COMPONENT_SRC).toContain('loadedPortraitStates.has(portraitState)');
   });
 });
 

@@ -86,6 +86,7 @@ html {
 .cs-root {
   display: flex;
   flex-direction: column;
+  box-sizing: border-box;
   min-height: 100dvh;
   background: var(--cs-bg-reality);
   font-family: var(--cs-font);
@@ -227,6 +228,11 @@ html {
     inset 8px 0 16px rgba(255, 255, 255, 0.03);
 }
 
+.cs-portrait-silhouette--hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
 .cs-portrait-silhouette[data-portrait-state="distant"] {
   background: var(--cs-silhouette-distant);
 }
@@ -263,16 +269,12 @@ html {
   left: 0;
   right: 0;
   height: 28%;
-  background:
-    url('/assets/cafe/table-foreground.webp'),
-    linear-gradient(
-      to top,
-      rgba(8, 6, 4, 0.95) 0%,
-      rgba(18, 14, 10, 0.70) 50%,
-      transparent 100%
-    );
-  background-size: cover, cover;
-  background-position: center top, center top;
+  background: linear-gradient(
+    to top,
+    rgba(8, 6, 4, 0.95) 0%,
+    rgba(18, 14, 10, 0.70) 50%,
+    transparent 100%
+  );
 }
 
 /* Vignette overlay */
@@ -602,6 +604,36 @@ html {
   line-height: 1.7;
   color: var(--cs-outcome-desc);
   font-style: italic;
+}
+
+.cs-outcome-reflection {
+  margin: 4px 0;
+  padding: 18px 20px;
+  border-left: 2px solid rgba(226, 208, 168, 0.55);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.cs-outcome-reflection figcaption {
+  margin-bottom: 10px;
+  color: rgba(232, 224, 210, 0.52);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.cs-outcome-reflection blockquote {
+  margin: 0 0 12px;
+  color: var(--cs-outcome-title);
+  font-size: clamp(1rem, 2.5vw, 1.2rem);
+  line-height: 1.55;
+}
+
+.cs-outcome-reflection p {
+  margin: 0;
+  color: var(--cs-outcome-desc);
+  font-size: 0.9rem;
+  line-height: 1.6;
 }
 
 .cs-restart-btn {

@@ -7,6 +7,8 @@ import {
   BLINK_SRC,
 } from './cinematicPresentation';
 import type { VisualSceneState } from './cinematicPresentation';
+import { buildOutcomeReflection } from '../game/reflection';
+import type { PortraitState } from '../game/types';
 import './ConversationScene.css';
 
 // Visual-only ephemeral mouth-open state after a new character response.
@@ -22,6 +24,7 @@ export default function ConversationScene() {
     error,
     mode,
     outcome,
+    assessments,
     imaginedResponse,
     setInput,
     submitTurn,
@@ -40,6 +43,12 @@ export default function ConversationScene() {
   // Ephemeral mouth-open state: triggered when a new character line arrives.
   const [mouthOpen, setMouthOpen] = useState(false);
   const mouthTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [loadedPortraitStates, setLoadedPortraitStates] = useState<Set<PortraitState>>(
+    () => new Set()
+  );
+  const [failedPortraitSources, setFailedPortraitSources] = useState<Set<string>>(
+    () => new Set()
+  );
 
   // Track last character line to detect new arrivals
   const lastCharacterLine = [...transcript]
@@ -66,10 +75,26 @@ export default function ConversationScene() {
 
   const blinkSrc = BLINK_SRC;
 
-  // Graceful image-error handler: hide only the failed image
+  const handlePortraitLoad = useCallback((state: PortraitState) => {
+    setLoadedPortraitStates((loaded) => {
+      if (loaded.has(state)) return loaded;
+      const next = new Set(loaded);
+      next.add(state);
+      return next;
+    });
+  }, []);
+
+  // Graceful image-error handler: hide only the failed image and retain the
+  // intentional silhouette fallback for the active state.
   const handleImgError = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
     e.currentTarget.style.display = 'none';
   }, []);
+  const handlePortraitError = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
+    handleImgError(e);
+    setFailedPortraitSources((failed) => new Set(failed).add(portraitSrc));
+  }, [handleImgError, portraitSrc]);
+  const portraitLoaded = loadedPortraitStates.has(portraitState)
+    && !failedPortraitSources.has(portraitSrc);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -91,6 +116,7 @@ export default function ConversationScene() {
 
   // ── OUTCOME SCENE ────────────────────────────────────────────────────────────
   if (isComplete && outcome) {
+    const reflection = buildOutcomeReflection(outcome.id, transcript, assessments);
     return (
       <div
         className="cs-root cs-outcome-mode"
@@ -100,6 +126,13 @@ export default function ConversationScene() {
         <div className="cs-outcome-card" role="main">
           <h1 className="cs-outcome-title">{outcome.title}</h1>
           <p className="cs-outcome-description">{outcome.description}</p>
+          {reflection.quote && (
+            <figure className="cs-outcome-reflection">
+              <figcaption>One thing you said</figcaption>
+              <blockquote>&ldquo;{reflection.quote}&rdquo;</blockquote>
+              <p>{reflection.explanation}</p>
+            </figure>
+          )}
           <button
             type="button"
             className="cs-restart-btn"
@@ -129,12 +162,14 @@ export default function ConversationScene() {
             data-portrait-state={PORTRAIT_DATA_STATE[portraitState]}
           >
             <img
+              key={portraitSrc}
               className="cs-portrait-img"
               src={portraitSrc}
               alt=""
               aria-hidden="true"
               draggable={false}
-              onError={handleImgError}
+              onLoad={() => handlePortraitLoad(portraitState)}
+              onError={handlePortraitError}
             />
             <img
               className="cs-portrait-img cs-portrait-blink"
@@ -146,7 +181,7 @@ export default function ConversationScene() {
             />
             {/* Silhouette placeholder — visible before artwork arrives */}
             <div
-              className="cs-portrait-silhouette"
+              className={`cs-portrait-silhouette${portraitLoaded ? ' cs-portrait-silhouette--hidden' : ''}`}
               data-portrait-state={PORTRAIT_DATA_STATE[portraitState]}
               aria-hidden="true"
             />

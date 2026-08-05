@@ -32,7 +32,7 @@ Copy `.env.example` to `.env` and set variables as needed:
 
 | Variable | Default | Description |
 |---|---|---|
-| `UNSAID_AI_MODE` | `mock` | `mock` for deterministic local responses; `live` for Gemini |
+| `UNSAID_AI_MODE` | `mock` | `mock` for local development; `recorded` for the deterministic demo-safe path; `live` for Gemini with recorded recovery |
 | `GEMINI_API_KEY` | *(none)* | Google AI Studio API key (required only for live mode) |
 | `GEMINI_BASE_URL` | `https://generativelanguage.googleapis.com/v1beta` | Gemini REST API base URL |
 | `GEMINI_MODEL` | `gemini-3.6-flash` | Model identifier |
@@ -40,7 +40,7 @@ Copy `.env.example` to `.env` and set variables as needed:
 
 **Default is mock.** No API key or paid account is required to run or develop locally.
 
-**Live mode** uses the Google Gemini Developer API via Google AI Studio. The intended configuration uses the **Google AI Studio free tier** and does not require enabling billing. If `UNSAID_AI_MODE=live` is set but `GEMINI_API_KEY` is missing or blank, the server emits one warning and falls back to the mock adapter for that run.
+**Live mode** uses the Google Gemini Developer API via Google AI Studio. If a live response fails validation or inference throws, the server recovers through the local recorded adapter. If `UNSAID_AI_MODE=live` is set but `GEMINI_API_KEY` is missing or blank, the server emits one warning and runs in recorded mode. No live-AI claim should be made while recorded mode is active; `/api/status` reports the active and recovery modes.
 
 ## Development
 

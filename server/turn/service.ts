@@ -6,14 +6,17 @@ import { ModelOutputSchema } from './schema';
 
 export async function processTurn(
   request: TurnRequest,
-  adapter: ModelAdapter
+  adapter: ModelAdapter,
+  recoveryAdapter?: ModelAdapter
 ): Promise<TurnResponse> {
   try {
     const raw = await adapter.generateTurn(request);
     const parsed = ModelOutputSchema.safeParse(raw);
 
     if (!parsed.success) {
-      return makeFallback(request);
+      return recoveryAdapter
+        ? processTurn(request, recoveryAdapter)
+        : makeFallback(request);
     }
 
     const output = parsed.data;
@@ -42,7 +45,9 @@ export async function processTurn(
       },
     };
   } catch {
-    return makeFallback(request);
+    return recoveryAdapter
+      ? processTurn(request, recoveryAdapter)
+      : makeFallback(request);
   }
 }
 

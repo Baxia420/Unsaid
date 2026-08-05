@@ -3,7 +3,10 @@ import { TurnRequestSchema } from './validation';
 import { processTurn } from './service';
 import { ModelAdapter } from '../adapters/ModelAdapter';
 
-export function createTurnRouter(adapter: ModelAdapter): Router {
+export function createTurnRouter(
+  adapter: ModelAdapter,
+  recoveryAdapter?: ModelAdapter
+): Router {
   const router = Router();
 
   router.post('/', async (req, res) => {
@@ -19,7 +22,7 @@ export function createTurnRouter(adapter: ModelAdapter): Router {
       });
     }
 
-    const response = await processTurn(parsed.data, adapter);
+    const response = await processTurn(parsed.data, adapter, recoveryAdapter);
     return res.status(200).json(response);
   });
 

@@ -1,6 +1,10 @@
 import express, { ErrorRequestHandler } from 'express';
 import { createTurnRouter } from './turn/route';
-import { createModelAdapter } from './adapters/factory';
+import {
+  createModelAdapter,
+  createRecoveryAdapter,
+  getRuntimeMode,
+} from './adapters/factory';
 
 const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
   if (err instanceof SyntaxError && 'body' in err) {
@@ -26,7 +30,14 @@ export function createApp(): express.Express {
   app.use(express.json());
 
   const adapter = createModelAdapter();
-  app.use('/api/turn', createTurnRouter(adapter));
+  const recoveryAdapter = createRecoveryAdapter();
+  app.get('/api/status', (_req, res) => {
+    res.json({
+      aiMode: getRuntimeMode(),
+      recoveryMode: recoveryAdapter ? 'recorded' : null,
+    });
+  });
+  app.use('/api/turn', createTurnRouter(adapter, recoveryAdapter));
 
   app.use(errorHandler);
 

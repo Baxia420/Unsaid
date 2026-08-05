@@ -37,7 +37,6 @@ export const PORTRAIT_DATA_STATE: Record<PortraitState, string> = {
 // ── Scene asset paths ────────────────────────────────────────────────────────
 
 export const CAFE_BACKGROUND = '/assets/cafe/cafe-window-afternoon.webp';
-export const TABLE_FOREGROUND = '/assets/cafe/table-foreground.webp';
 
 // ── Visual scene-state values (presentation only) ────────────────────────────
 
