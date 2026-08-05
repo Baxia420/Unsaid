@@ -1,11 +1,119 @@
 import 'dotenv/config';
-import { GeminiModelAdapter } from '../server/adapters/GeminiModelAdapter';
-import { ModelOutputSchema } from '../server/turn/schema';
+import type {
+  ModelOutput,
+  PlayerIntent,
+  TranscriptEntry,
+  TurnRequest,
+} from '../src/game/types';
 import { SCENARIO } from '../src/game/scenario';
+import { GeminiModelAdapter } from '../server/adapters/GeminiModelAdapter';
+import { MockModelAdapter } from '../server/adapters/MockModelAdapter';
+import { RecordedModelAdapter } from '../server/adapters/RecordedModelAdapter';
+import type { ModelAdapter } from '../server/adapters/ModelAdapter';
+import { ModelOutputSchema } from '../server/turn/schema';
 
-const messages=[
-  ['understand','What hurt most when I did not come?'],['explain','I was overwhelmed, but I should have told you the truth.'],
-  ['repair','What would rebuilding trust require from me?']
-] as const;
-async function main(){if(process.env.UNSAID_AI_MODE!=='live'||!process.env.GEMINI_API_KEY?.trim()){console.error('Live evaluation requires configured live mode and a Gemini key.');process.exit(1);}const adapter=new GeminiModelAdapter();let transcript:any[]=[];for(let i=0;i<messages.length;i++){const [selectedIntention,playerText]=messages[i];const output=ModelOutputSchema.safeParse(await adapter.generateTurn({scenarioId:SCENARIO.id,turnIndex:i,playerText,selectedIntention,state:{engagement:-3,tension:1},recentTranscript:transcript}));if(!output.success)throw new Error('Schema-invalid live response');if(/\b(ai|prompt|score|outcome)\b/i.test(output.data.characterText))throw new Error('Out-of-character live response');transcript.push({speaker:'player',text:playerText},{speaker:'character',text:output.data.characterText});console.log(`case ${i+1}: valid dynamic response`);}console.log('Focused live evaluation passed (3 requests).');}
-main().catch(error=>{console.error(error instanceof Error?error.message:'Live evaluator failed');process.exit(1);});
+type EvaluatorMode = 'mock' | 'recorded' | 'live';
+
+interface EvaluationCase {
+  name: string;
+  intention: PlayerIntent;
+  playerText: string;
+  acceptableImpacts: ModelOutput['perceivedImpact'][];
+  transcript?: TranscriptEntry[];
+  turnIndex?: number;
+  requiresClosures?: boolean;
+}
+
+const FIXED_TRANSCRIPT: TranscriptEntry[] = [
+  { speaker: 'character', text: SCENARIO.openingLine },
+];
+
+export const EVALUATION_CASES: EvaluationCase[] = [
+  { name: 'understand', intention: 'understand', playerText: 'What hurt most about me not being there?', acceptableImpacts: ['understanding', 'acknowledgment'] },
+  { name: 'acknowledge', intention: 'acknowledge', playerText: 'You were waiting for me, and I left you doing that alone.', acceptableImpacts: ['acknowledgment'] },
+  { name: 'accountable explanation', intention: 'explain', playerText: 'I panicked and avoided telling you the truth. That explains it, but it does not excuse it.', acceptableImpacts: ['explanation', 'acknowledgment'] },
+  { name: 'defensive explanation', intention: 'explain', playerText: 'I had a lot going on. You know how stressful my life gets.', acceptableImpacts: ['defense', 'explanation'] },
+  { name: 'minimization', intention: 'explain', playerText: "It was one event. I don't understand why this became such a huge thing.", acceptableImpacts: ['minimization', 'defense'] },
+  { name: 'avoidance', intention: 'understand', playerText: 'Anyway, how has work been?', acceptableImpacts: ['avoidance'] },
+  { name: 'pressure disguised as repair', intention: 'repair', playerText: "Can you please just say we're okay so we can move on?", acceptableImpacts: ['pressure'] },
+  { name: 'genuine repair', intention: 'repair', playerText: 'I know an apology does not rebuild trust. What would I need to do differently?', acceptableImpacts: ['repair', 'understanding'] },
+  { name: 'confusing input', intention: 'explain', playerText: 'The blue folder was louder yesterday, I guess.', acceptableImpacts: ['unclear', 'avoidance'] },
+  { name: 'recovery after harm', intention: 'acknowledge', playerText: 'I kept defending myself. You were waiting, I lied, and I hurt you.', acceptableImpacts: ['acknowledgment'], transcript: [...FIXED_TRANSCRIPT, { speaker: 'player', text: 'It was just one event.' }, { speaker: 'character', text: 'It was the waiting and the lie.' }] },
+  { name: 'late deterioration', intention: 'repair', playerText: "I've apologized enough. Can you just forgive me now?", acceptableImpacts: ['pressure', 'defense'], transcript: [...FIXED_TRANSCRIPT, { speaker: 'player', text: 'I understand why you were hurt.' }, { speaker: 'character', text: 'I appreciate that.' }] },
+  { name: 'final turn closures', intention: 'repair', playerText: 'I will respect whatever distance you need.', acceptableImpacts: ['repair', 'acknowledgment', 'understanding'], turnIndex: 14, requiresClosures: true },
+];
+
+function parseMode(): EvaluatorMode {
+  const argument = process.argv.find((value) => value.startsWith('--adapter='));
+  const value = argument?.split('=')[1] ?? 'mock';
+  if (value === 'mock' || value === 'recorded' || value === 'live') return value;
+  throw new Error(`Unsupported evaluator adapter: ${value}`);
+}
+
+function createAdapter(mode: EvaluatorMode): ModelAdapter {
+  if (mode === 'mock') return new MockModelAdapter();
+  if (mode === 'recorded') return new RecordedModelAdapter();
+  if (!process.env.GEMINI_API_KEY?.trim()) {
+    throw new Error('Live evaluation requires a Gemini API key.');
+  }
+  return new GeminiModelAdapter();
+}
+
+function validateQuality(
+  evaluationCase: EvaluationCase,
+  output: ModelOutput
+): string[] {
+  const failures: string[] = [];
+  if (output.characterText.length > 800) failures.push('dialogue is too long');
+  if (/\b(ai|prompt|game mechanic|score|outcome title)\b/i.test(output.characterText)) {
+    failures.push('dialogue exposed system terminology');
+  }
+  if (!evaluationCase.acceptableImpacts.includes(output.perceivedImpact)) {
+    failures.push(`unexpected impact ${output.perceivedImpact}`);
+  }
+  if (!output.impactReason || output.impactReason.length > 180) {
+    failures.push('impactReason is missing or unbounded');
+  }
+  if (evaluationCase.requiresClosures && !output.finalClosures) {
+    failures.push('finalClosures are missing');
+  }
+  return failures;
+}
+
+async function run(): Promise<void> {
+  const mode = parseMode();
+  const adapter = createAdapter(mode);
+  const cases = mode === 'live' ? EVALUATION_CASES.slice(0, 5) : EVALUATION_CASES;
+  let passed = 0;
+
+  for (const evaluationCase of cases) {
+    const request: TurnRequest = {
+      scenarioId: SCENARIO.id,
+      turnIndex: evaluationCase.turnIndex ?? 4,
+      playerText: evaluationCase.playerText,
+      selectedIntention: evaluationCase.intention,
+      state: { engagement: -2, tension: 2 },
+      recentTranscript: evaluationCase.transcript ?? FIXED_TRANSCRIPT,
+    };
+    const parsed = ModelOutputSchema.safeParse(await adapter.generateTurn(request));
+    if (!parsed.success) {
+      console.log(`${evaluationCase.name}: FAIL (schema)`);
+      continue;
+    }
+    const failures = validateQuality(evaluationCase, parsed.data);
+    if (failures.length) {
+      console.log(`${evaluationCase.name}: FAIL (${failures.join(', ')})`);
+      continue;
+    }
+    passed += 1;
+    console.log(`${evaluationCase.name}: PASS`);
+  }
+
+  console.log(`${mode} evaluator: ${passed}/${cases.length} passed`);
+  if (passed !== cases.length) process.exitCode = 1;
+}
+
+run().catch((error) => {
+  console.error(error instanceof Error ? error.message : 'Evaluator failed');
+  process.exitCode = 1;
+});

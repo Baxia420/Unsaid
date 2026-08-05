@@ -1,1 +1,15 @@
-import { MockModelAdapter } from './MockModelAdapter'; export class RecordedModelAdapter extends MockModelAdapter { constructor(){super('valid');} }
+import type { ModelAdapter } from './ModelAdapter';
+import type { TurnRequest } from '../../src/game/types';
+import { MockModelAdapter } from './MockModelAdapter';
+
+/**
+ * Deterministic demo-safe adapter. It owns no mutable run state and performs
+ * no network activity, so independent runs cannot leak into one another.
+ */
+export class RecordedModelAdapter implements ModelAdapter {
+  private readonly deterministicAdapter = new MockModelAdapter();
+
+  generateTurn(request: TurnRequest): Promise<unknown> {
+    return this.deterministicAdapter.generateTurn(request);
+  }
+}

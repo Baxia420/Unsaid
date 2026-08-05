@@ -1,17 +1,76 @@
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
 import { describe, expect, it } from 'vitest';
-import { SCENARIO } from '../src/game/scenario'; import { applyTurn, derivePortraitState } from '../src/game/state'; import { classifyAlignment, evaluateOutcome } from '../src/game/outcome'; import { ModelOutputSchema, PlayerIntentSchema, PerceivedImpactSchema } from '../server/turn/schema'; import { TurnRequestSchema } from '../server/turn/validation'; import { processTurn } from '../server/turn/service'; import { MockModelAdapter } from '../server/adapters/MockModelAdapter';
+import { SCENARIO } from '../src/game/scenario';
+import { buildLivePrompt } from '../server/turn/prompt';
+import { makeRequest } from './helpers';
 
-const request=(turnIndex=0)=>({scenarioId:SCENARIO.id,turnIndex,playerText:'I am sorry I hurt you.',selectedIntention:'acknowledge' as const,state:{engagement:-3,tension:1},recentTranscript:[]});
-const assessment=(impact:any,alignment:any='aligned')=>({selectedIntent:'acknowledge' as const,perceivedImpact:impact,impactReason:'It landed clearly.',alignment,engagementDelta:0,tensionDelta:0});
-describe('dynamic conversation core',()=>{
- it('defines a 15-turn scenario with scenario-owned prologue and no turn script',()=>{expect(SCENARIO.totalTurns).toBe(15);expect(SCENARIO.prologue.join(' ')).toContain('nine years');expect((SCENARIO as any).beats).toBeUndefined();});
- it('validates all four intentions and rejects a missing intention',()=>{for(const i of ['understand','acknowledge','explain','repair'])expect(PlayerIntentSchema.safeParse(i).success).toBe(true);expect(TurnRequestSchema.safeParse({...request(),selectedIntention:undefined}).success).toBe(false);});
- it('validates the complete impact vocabulary and bounded plain reasons',()=>{for(const i of ['understanding','acknowledgment','explanation','repair','defense','minimization','pressure','avoidance','unclear'])expect(PerceivedImpactSchema.safeParse(i).success).toBe(true);expect(ModelOutputSchema.safeParse({characterText:'x',perceivedImpact:'repair',impactReason:'<b>bad</b>',engagementDelta:0,tensionDelta:0}).success).toBe(false);});
- it('blocks a sixteenth request at validation',()=>expect(TurnRequestSchema.safeParse(request(15)).success).toBe(false));
- it('keeps state clamped and has a guarded opening portrait',()=>{expect(derivePortraitState(-3,1)).toBe('distant');const next=applyTurn({engagement:10,tension:-10,portraitState:'connected'},99,-99);expect(next.engagement).toBe(10);expect(next.tension).toBe(-10);});
- it('can reach every portrait deterministically',()=>{expect(new Set([derivePortraitState(-3,1),derivePortraitState(-3,5),derivePortraitState(1,3),derivePortraitState(5,0)])).toEqual(new Set(['distant','defensive','hurt_exposed','connected']));});
- it('computes intent alignment in code',()=>{expect(classifyAlignment('acknowledge','acknowledgment')).toBe('aligned');expect(classifyAlignment('repair','understanding')).toBe('constructive_divergence');expect(classifyAlignment('understand','pressure')).toBe('harmful_divergence');});
- it('keeps all outcomes reachable through accumulated patterns',()=>{const good=Array.from({length:15},()=>assessment('repair'));const bad=Array.from({length:15},()=>assessment('pressure','harmful_divergence'));const middle=Array.from({length:15},()=>assessment('unclear','constructive_divergence'));expect(evaluateOutcome({assessments:good,finalEngagement:5,finalTension:0})).toBe('even');expect(evaluateOutcome({assessments:bad,finalEngagement:-5,finalTension:8})).toBe('the_speech');expect(evaluateOutcome({assessments:middle,finalEngagement:0,finalTension:0})).toBe('smoothed');});
- it('uses one model result including closings only on turn fifteen',async()=>{const a=new MockModelAdapter();const normal=await processTurn(request(),a);expect(normal.finalClosures).toBeUndefined();const final=await processTurn(request(14),a);expect(final.finalClosures?.even).toBeTruthy();});
- it('keeps malformed output playable with deterministic closing fallback',async()=>{const result=await processTurn(request(14),new MockModelAdapter('malformed'));expect(result.assessment.perceivedImpact).toBe('unclear');expect(result.finalClosures).toEqual(SCENARIO.fallbackClosures);});
+const ROOT = resolve(__dirname, '..');
+const STORE_SOURCE = readFileSync(resolve(ROOT, 'src/game/store.ts'), 'utf8');
+
+describe('dynamic gameplay contract', () => {
+  it('allows exactly 15 committed turns', () => expect(SCENARIO.totalTurns).toBe(15));
+  it('owns the prologue in scenario data', () => {
+    expect(SCENARIO.prologue.join(' ')).toContain('nine years');
+    expect(SCENARIO.prologue.join(' ')).toContain('important public event');
+  });
+  it('contains all fixed facts', () => {
+    expect(SCENARIO.facts).toEqual(expect.arrayContaining(['limited invitation', 'broken promise', 'false excuse', 'waiting at the door', 'three weeks of silence']));
+  });
+  it('has no mandatory per-turn story script', () => {
+    expect(SCENARIO).not.toHaveProperty('beats');
+    expect(SCENARIO).not.toHaveProperty('chapters');
+  });
+  it('has no rehearsal or imagined-response domain state', () => {
+    expect(STORE_SOURCE.toLowerCase()).not.toContain('rehears');
+    expect(STORE_SOURCE).not.toContain('imaginedResponse');
+  });
+});
+
+describe('dynamic production prompt', () => {
+  const request = makeRequest({
+    turnIndex: 6,
+    selectedIntention: 'explain',
+    state: { engagement: 2, tension: 4 },
+    recentTranscript: [
+      { speaker: 'character', text: 'First line.' },
+      { speaker: 'player', text: 'Earlier player line.' },
+      { speaker: 'character', text: 'Earlier friend line.' },
+    ],
+  });
+  const prompt = buildLivePrompt(request);
+
+  it.each([
+    'nine years', 'important public event', 'promised to attend', 'falsely said',
+    'checked the door', 'weeks of silence', 'café',
+  ])('includes fixed fact: %s', (fact) => expect(prompt.system).toContain(fact));
+  it('passes the complete transcript', () => {
+    expect(prompt.user).toContain('First line.');
+    expect(prompt.user).toContain('Earlier player line.');
+    expect(prompt.user).toContain('Earlier friend line.');
+  });
+  it('passes intention and emotional state', () => {
+    expect(prompt.user).toContain('Selected intention: explain');
+    expect(prompt.user).toContain('Connection: 2');
+    expect(prompt.user).toContain('Pressure: 4');
+  });
+  it.each([
+    'turn number', 'facts surface naturally', 'early', 'late recovery',
+    'regression', 'failure', 'Do not require keywords', 'automatically forgive',
+  ])('includes dynamic safeguard: %s', (rule) => {
+    expect(prompt.system.toLowerCase()).toContain(rule.toLowerCase());
+  });
+  it('prohibits AI, game, prompt, score, and outcome terminology', () => {
+    for (const term of ['AI', 'prompts', 'game mechanics', 'scores', 'outcome titles']) {
+      expect(prompt.system).toContain(term);
+    }
+  });
+  it('does not request closures before turn 15', () => {
+    expect(prompt.system).toContain('Do not return finalClosures on this turn.');
+  });
+  it('requests all three closures on turn 15 without model outcome selection', () => {
+    const finalPrompt = buildLivePrompt(makeRequest({ turnIndex: 14 }));
+    expect(finalPrompt.system).toContain('even, smoothed, and the_speech');
+    expect(finalPrompt.system).toContain('Do not choose an outcome');
+  });
 });

@@ -1,21 +1,86 @@
-import type { Alignment, OutcomeId, PerceivedImpact, TurnAssessment } from './types';
+import type {
+  Alignment,
+  OutcomeId,
+  PerceivedImpact,
+  PlayerIntent,
+  TurnAssessment,
+} from './types';
 
-const constructive = new Set<PerceivedImpact>(['understanding', 'acknowledgment', 'explanation', 'repair']);
-const harmful = new Set<PerceivedImpact>(['defense', 'minimization', 'pressure', 'avoidance']);
-export function classifyAlignment(intent: string, impact: PerceivedImpact): Alignment {
-  const direct: Record<string, PerceivedImpact> = { understand: 'understanding', acknowledge: 'acknowledgment', explain: 'explanation', repair: 'repair' };
-  if (direct[intent] === impact) return 'aligned';
-  if (harmful.has(impact)) return 'harmful_divergence';
+const DIRECT_IMPACT: Record<PlayerIntent, PerceivedImpact> = {
+  understand: 'understanding',
+  acknowledge: 'acknowledgment',
+  explain: 'explanation',
+  repair: 'repair',
+};
+
+const CONSTRUCTIVE_IMPACTS = new Set<PerceivedImpact>([
+  'understanding',
+  'acknowledgment',
+  'explanation',
+  'repair',
+]);
+
+const HARMFUL_IMPACTS = new Set<PerceivedImpact>([
+  'defense',
+  'minimization',
+  'pressure',
+  'avoidance',
+]);
+
+export interface OutcomeInputs {
+  assessments: TurnAssessment[];
+  finalEngagement: number;
+  finalTension: number;
+}
+
+export function classifyAlignment(
+  intention: PlayerIntent,
+  impact: PerceivedImpact
+): Alignment {
+  if (DIRECT_IMPACT[intention] === impact) return 'aligned';
+  if (HARMFUL_IMPACTS.has(impact)) return 'harmful_divergence';
   return 'constructive_divergence';
 }
-export function evaluateOutcome(input: { assessments: TurnAssessment[]; finalEngagement: number; finalTension: number }): OutcomeId {
-  const { assessments, finalEngagement, finalTension } = input;
-  const aligned = assessments.filter(a => a.alignment === 'aligned').length;
-  const harmfulCount = assessments.filter(a => a.alignment === 'harmful_divergence').length;
-  const constructiveCount = assessments.filter(a => constructive.has(a.perceivedImpact)).length;
-  const lateHarm = assessments.slice(-4).filter(a => harmful.has(a.perceivedImpact)).length;
-  const lateRepair = assessments.slice(-5).filter(a => a.perceivedImpact === 'repair' || a.perceivedImpact === 'acknowledgment').length;
-  if (harmfulCount >= 6 || lateHarm >= 3 || (finalTension >= 7 && finalEngagement <= -2)) return 'the_speech';
-  if (constructiveCount >= 7 && aligned >= 4 && finalEngagement >= 2 && finalTension <= 5 && lateRepair >= 2) return 'even';
+
+export function evaluateOutcome(inputs: OutcomeInputs): OutcomeId {
+  const { assessments, finalEngagement, finalTension } = inputs;
+  const alignedCount = assessments.filter(
+    (assessment) => assessment.alignment === 'aligned'
+  ).length;
+  const harmfulCount = assessments.filter((assessment) =>
+    HARMFUL_IMPACTS.has(assessment.perceivedImpact)
+  ).length;
+  const constructiveCount = assessments.filter((assessment) =>
+    CONSTRUCTIVE_IMPACTS.has(assessment.perceivedImpact)
+  ).length;
+  const lateHarmCount = assessments
+    .slice(-4)
+    .filter((assessment) => HARMFUL_IMPACTS.has(assessment.perceivedImpact)).length;
+  const lateRepairCount = assessments
+    .slice(-5)
+    .filter(
+      (assessment) =>
+        assessment.perceivedImpact === 'repair' ||
+        assessment.perceivedImpact === 'acknowledgment'
+    ).length;
+
+  if (
+    harmfulCount >= 6 ||
+    lateHarmCount >= 3 ||
+    (finalTension >= 7 && finalEngagement <= -2)
+  ) {
+    return 'the_speech';
+  }
+
+  if (
+    constructiveCount >= 7 &&
+    alignedCount >= 4 &&
+    finalEngagement >= 2 &&
+    finalTension <= 5 &&
+    lateRepairCount >= 2
+  ) {
+    return 'even';
+  }
+
   return 'smoothed';
 }

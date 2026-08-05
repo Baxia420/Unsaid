@@ -1,46 +1,282 @@
 import { create } from 'zustand';
-import type { AppMode, FinalClosures, OutcomeDef, PlayerIntent, PortraitState, TranscriptEntry, TurnAssessment, TurnRequest } from './types';
+import type {
+  AppMode,
+  FinalClosures,
+  OutcomeDef,
+  PlayerIntent,
+  PortraitState,
+  TranscriptEntry,
+  TurnAssessment,
+  TurnRequest,
+} from './types';
 import { SCENARIO } from './scenario';
 import { applyTurn, derivePortraitState } from './state';
 import { classifyAlignment, evaluateOutcome } from './outcome';
 import { postTurn } from '../lib/turnClient';
 
 type Status = 'idle' | 'loading' | 'error';
-export interface GameStore {
-  mode: AppMode; status: Status; error: string | null; input: string; selectedIntention: PlayerIntent | null;
-  engagement: number; tension: number; portraitState: PortraitState; transcript: TranscriptEntry[]; turnIndex: number;
-  assessments: TurnAssessment[]; outcome: OutcomeDef | null; closingMessage: string | null;
-  pendingMessage: string | null; pendingIntention: PlayerIntent | null;
-  start: () => void; continueFromPrologue: () => void; selectIntention: (intent: PlayerIntent) => void;
-  setInput: (input: string) => void; submitTurn: () => Promise<void>; retryTurn: () => Promise<void>;
-  pause: () => void; resume: () => void; continueToOutcome: () => void; restart: () => void; returnToTitle: () => void;
+
+interface GameData {
+  mode: AppMode;
+  status: Status;
+  error: string | null;
+  input: string;
+  selectedIntention: PlayerIntent | null;
+  engagement: number;
+  tension: number;
+  portraitState: PortraitState;
+  transcript: TranscriptEntry[];
+  turnIndex: number;
+  assessments: TurnAssessment[];
+  outcome: OutcomeDef | null;
+  closingMessage: string | null;
+  pendingMessage: string | null;
+  pendingIntention: PlayerIntent | null;
+  runId: number;
+  activeRequestId: number | null;
 }
-function initial(): Omit<GameStore, 'start'|'continueFromPrologue'|'selectIntention'|'setInput'|'submitTurn'|'retryTurn'|'pause'|'resume'|'continueToOutcome'|'restart'|'returnToTitle'> {
-  const s = SCENARIO.startingState;
-  return { mode:'title', status:'idle', error:null, input:'', selectedIntention:null, engagement:s.engagement, tension:s.tension, portraitState:derivePortraitState(s.engagement,s.tension), transcript:[], turnIndex:0, assessments:[], outcome:null, closingMessage:null, pendingMessage:null, pendingIntention:null };
+
+export interface GameStore extends GameData {
+  start: () => void;
+  continueFromPrologue: () => void;
+  selectIntention: (intent: PlayerIntent) => void;
+  setInput: (input: string) => void;
+  submitTurn: () => Promise<void>;
+  retryTurn: () => Promise<void>;
+  pause: () => void;
+  resume: () => void;
+  continueToOutcome: () => void;
+  restart: () => void;
+  returnToTitle: () => void;
 }
-async function execute(get:()=>GameStore,set:(p:Partial<GameStore>)=>void,message:string,intention:PlayerIntent) {
-  const state=get(); const request:TurnRequest={scenarioId:SCENARIO.id,turnIndex:state.turnIndex,playerText:message,selectedIntention:intention,state:{engagement:state.engagement,tension:state.tension},recentTranscript:state.transcript};
+
+let nextRequestId = 1;
+
+export function createInitialState(runId = 0): GameData {
+  const { engagement, tension } = SCENARIO.startingState;
+  return {
+    mode: 'title',
+    status: 'idle',
+    error: null,
+    input: '',
+    selectedIntention: null,
+    engagement,
+    tension,
+    portraitState: derivePortraitState(engagement, tension),
+    transcript: [],
+    turnIndex: 0,
+    assessments: [],
+    outcome: null,
+    closingMessage: null,
+    pendingMessage: null,
+    pendingIntention: null,
+    runId,
+    activeRequestId: null,
+  };
+}
+
+function isCurrentRequest(
+  state: GameStore,
+  runId: number,
+  requestId: number
+): boolean {
+  return state.runId === runId && state.activeRequestId === requestId;
+}
+
+async function executeTurn(
+  get: () => GameStore,
+  set: (partial: Partial<GameStore>) => void,
+  message: string,
+  intention: PlayerIntent
+): Promise<void> {
+  const initialState = get();
+  const runId = initialState.runId;
+  const requestId = nextRequestId++;
+  const request: TurnRequest = {
+    scenarioId: SCENARIO.id,
+    turnIndex: initialState.turnIndex,
+    playerText: message,
+    selectedIntention: intention,
+    state: {
+      engagement: initialState.engagement,
+      tension: initialState.tension,
+    },
+    recentTranscript: initialState.transcript,
+  };
+
+  set({ activeRequestId: requestId });
+
   try {
-    const response=await postTurn(request); const current=get();
-    const next=applyTurn({engagement:current.engagement,tension:current.tension,portraitState:current.portraitState},response.assessment.engagementDelta,response.assessment.tensionDelta);
-    const assessment:TurnAssessment={...response.assessment,selectedIntent:intention,alignment:classifyAlignment(intention,response.assessment.perceivedImpact)};
-    const assessments=[...current.assessments,assessment]; const turnIndex=current.turnIndex+1;
-    const transcript=[...current.transcript,{speaker:'player' as const,text:message},{speaker:'character' as const,text:response.characterText}];
+    const response = await postTurn(request);
+    const current = get();
+    if (!isCurrentRequest(current, runId, requestId)) return;
+
+    const nextState = applyTurn(
+      {
+        engagement: current.engagement,
+        tension: current.tension,
+        portraitState: current.portraitState,
+      },
+      response.assessment.engagementDelta,
+      response.assessment.tensionDelta
+    );
+    const assessment: TurnAssessment = {
+      ...response.assessment,
+      selectedIntent: intention,
+      alignment: classifyAlignment(
+        intention,
+        response.assessment.perceivedImpact
+      ),
+    };
+    const assessments = [...current.assessments, assessment];
+    const turnIndex = current.turnIndex + 1;
+    const transcript: TranscriptEntry[] = [
+      ...current.transcript,
+      { speaker: 'player', text: message },
+      { speaker: 'character', text: response.characterText },
+    ];
+    const commonUpdate: Partial<GameStore> = {
+      engagement: nextState.engagement,
+      tension: nextState.tension,
+      portraitState: nextState.portraitState,
+      transcript,
+      assessments,
+      turnIndex,
+      input: '',
+      selectedIntention: null,
+      pendingMessage: null,
+      pendingIntention: null,
+      status: 'idle',
+      error: null,
+      activeRequestId: null,
+    };
+
     if (turnIndex === SCENARIO.totalTurns) {
-      const id=evaluateOutcome({assessments,finalEngagement:next.engagement,finalTension:next.tension});
-      const closures:FinalClosures=response.finalClosures ?? SCENARIO.fallbackClosures;
-      set({engagement:next.engagement,tension:next.tension,portraitState:next.portraitState,transcript,assessments,turnIndex,input:'',selectedIntention:null,pendingMessage:null,pendingIntention:null,status:'idle',error:null,outcome:SCENARIO.outcomes[id],closingMessage:closures[id],mode:'closing'});
-    } else set({engagement:next.engagement,tension:next.tension,portraitState:next.portraitState,transcript,assessments,turnIndex,input:'',selectedIntention:null,pendingMessage:null,pendingIntention:null,status:'idle',error:null});
-  } catch (e) { set({status:'error',error:e instanceof Error?e.message:'Something went wrong. Please try again.'}); }
+      const outcomeId = evaluateOutcome({
+        assessments,
+        finalEngagement: nextState.engagement,
+        finalTension: nextState.tension,
+      });
+      const closures: FinalClosures =
+        response.finalClosures ?? SCENARIO.fallbackClosures;
+      set({
+        ...commonUpdate,
+        outcome: SCENARIO.outcomes[outcomeId],
+        closingMessage: closures[outcomeId],
+        mode: current.mode === 'paused' ? 'paused' : 'closing',
+      });
+      return;
+    }
+
+    set(commonUpdate);
+  } catch (error) {
+    const current = get();
+    if (!isCurrentRequest(current, runId, requestId)) return;
+    set({
+      status: 'error',
+      activeRequestId: null,
+      error:
+        error instanceof Error
+          ? error.message
+          : 'Something went wrong. Please try again.',
+    });
+  }
 }
-export const useGameStore=create<GameStore>((set,get)=>({
-  ...initial(),
-  start:()=>set({...initial(),mode:'prologue'}), continueFromPrologue:()=>set({mode:'playing',transcript:[{speaker:'character',text:SCENARIO.openingLine}]}),
-  selectIntention:selectedIntention=>set({selectedIntention}), setInput:input=>set({input}),
-  submitTurn:async()=>{const s=get(),message=s.input.trim(),intent=s.selectedIntention;if(!message||!intent||s.status==='loading'||s.mode!=='playing'||s.turnIndex>=SCENARIO.totalTurns)return;if(message.length>SCENARIO.maxPlayerTextLength){set({status:'error',error:`Message must be ${SCENARIO.maxPlayerTextLength} characters or less.`});return;}set({status:'loading',error:null,pendingMessage:message,pendingIntention:intent});await execute(get,set,message,intent);},
-  retryTurn:async()=>{const s=get();if(s.status!=='error'||!s.pendingMessage||!s.pendingIntention||s.mode!=='playing')return;set({status:'loading',error:null});await execute(get,set,s.pendingMessage,s.pendingIntention);},
-  pause:()=>{if(get().mode==='playing')set({mode:'paused'});}, resume:()=>{if(get().mode==='paused')set({mode:'playing'});},
-  continueToOutcome:()=>{if(get().mode==='closing')set({mode:'outcome'});}, restart:()=>set({...initial(),mode:'prologue'}), returnToTitle:()=>set(initial())
+
+export const useGameStore = create<GameStore>((set, get) => ({
+  ...createInitialState(),
+
+  start: () => {
+    const runId = get().runId + 1;
+    set({ ...createInitialState(runId), mode: 'prologue' });
+  },
+
+  continueFromPrologue: () => {
+    if (get().mode !== 'prologue') return;
+    set({
+      mode: 'playing',
+      transcript: [{ speaker: 'character', text: SCENARIO.openingLine }],
+    });
+  },
+
+  selectIntention: (selectedIntention) => set({ selectedIntention }),
+  setInput: (input) => set({ input }),
+
+  submitTurn: async () => {
+    const state = get();
+    const message = state.input.trim();
+    const intention = state.selectedIntention;
+    if (
+      !message ||
+      !intention ||
+      state.status === 'loading' ||
+      state.mode !== 'playing' ||
+      state.turnIndex >= SCENARIO.totalTurns
+    ) {
+      return;
+    }
+    if (message.length > SCENARIO.maxPlayerTextLength) {
+      set({
+        status: 'error',
+        error: `Message must be ${SCENARIO.maxPlayerTextLength} characters or less.`,
+      });
+      return;
+    }
+
+    set({
+      status: 'loading',
+      error: null,
+      pendingMessage: message,
+      pendingIntention: intention,
+    });
+    await executeTurn(get, set, message, intention);
+  },
+
+  retryTurn: async () => {
+    const state = get();
+    if (
+      state.status !== 'error' ||
+      !state.pendingMessage ||
+      !state.pendingIntention ||
+      state.mode !== 'playing'
+    ) {
+      return;
+    }
+    set({ status: 'loading', error: null });
+    await executeTurn(
+      get,
+      set,
+      state.pendingMessage,
+      state.pendingIntention
+    );
+  },
+
+  pause: () => {
+    if (get().mode === 'playing') set({ mode: 'paused' });
+  },
+
+  resume: () => {
+    const state = get();
+    if (state.mode !== 'paused') return;
+    set({
+      mode:
+        state.turnIndex >= SCENARIO.totalTurns && state.closingMessage
+          ? 'closing'
+          : 'playing',
+    });
+  },
+
+  continueToOutcome: () => {
+    if (get().mode === 'closing') set({ mode: 'outcome' });
+  },
+
+  restart: () => {
+    const runId = get().runId + 1;
+    set({ ...createInitialState(runId), mode: 'prologue' });
+  },
+
+  returnToTitle: () => {
+    const runId = get().runId + 1;
+    set(createInitialState(runId));
+  },
 }));
-export { initial as createInitialState };
