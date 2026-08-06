@@ -33,8 +33,9 @@ import {
   generateReadTheRoomHint,
   humanizeLabel,
 } from './cinematicPresentation';
-import type { PlayerIntent, PortraitState, TurnAssessment } from '../game/types';
+import type { PlayerIntent, PortraitState, TranscriptEntry, TurnAssessment, TurnNarrativeMeta } from '../game/types';
 import './ConversationScene.css';
+import { formatConversationTranscript } from './conversationLog';
 
 // ─── Presentation-local types ──────────────────────────
 type InteractionStage =
@@ -103,6 +104,7 @@ export default function ConversationScene() {
   const outcome = useGameStore((s) => s.outcome);
   const closingMessage = useGameStore((s) => s.closingMessage);
   const assessments = useGameStore((s) => s.assessments);
+  const narrativeHistory = useGameStore((s) => s.narrativeHistory);
   const engagement = useGameStore((s) => s.engagement);
   const tension = useGameStore((s) => s.tension);
   const portraitState = useGameStore((s) => s.portraitState);
@@ -141,13 +143,13 @@ export default function ConversationScene() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [hintOpen, setHintOpen] = useState(false);
   const [showReview, setShowReview] = useState(false);
-  const transcriptRef = useRef<HTMLDivElement>(null);
-  const [awayFromLatest, setAwayFromLatest] = useState(false);
+  const [showConversationLog, setShowConversationLog] = useState(false);
   const reducedMotion = useReducedMotion();
 
   // ── Derived values ───────────────────────────────────
   const connPct = Math.round(((engagement + 10) / 20) * 100);
   const presPct = Math.round(((tension + 10) / 20) * 100);
+  const currentDialogue = [...transcript].reverse().find((entry) => entry.speaker === 'character');
   const portrait = portraitState ?? 'distant';
   const open = ['connected', 'hurt_exposed'].includes(portrait);
 
@@ -273,18 +275,6 @@ export default function ConversationScene() {
     }
   }
 
-  const scrollToLatest = useCallback(() => {
-    const element = transcriptRef.current;
-    if (!element) return;
-    element.scrollTo({ top: element.scrollHeight, behavior: reducedMotion ? 'auto' : 'smooth' });
-    setAwayFromLatest(false);
-  }, [reducedMotion]);
-
-  const handleTranscriptScroll = useCallback(() => {
-    const element = transcriptRef.current;
-    if (!element) return;
-    setAwayFromLatest(element.scrollHeight - element.scrollTop - element.clientHeight > 48);
-  }, []);
 
   // ── Effects ──────────────────────────────────────────
   useEffect(() => {
@@ -342,11 +332,6 @@ export default function ConversationScene() {
     }
   }, [turnIndex]);
 
-  useEffect(() => {
-    const element = transcriptRef.current;
-    if (!element || awayFromLatest) return;
-    element.scrollTop = element.scrollHeight;
-  }, [transcript.length, awayFromLatest]);
 
   // Prologue keyboard
   useEffect(() => {
@@ -652,6 +637,13 @@ export default function ConversationScene() {
           </div>
           <button
             className="cs-hud-pause-btn"
+            onClick={() => setShowConversationLog(true)}
+            aria-label="Open Conversation Log"
+          >
+            Conversation Log
+          </button>
+          <button
+            className="cs-hud-pause-btn"
             onClick={storePause}
             aria-label="Pause the game"
             title="Pause (Esc)"
@@ -689,28 +681,12 @@ export default function ConversationScene() {
         {/* Table foreground */}
         <div className="cs-table-foreground" />
 
-        <div className="cs-conversation-rail" aria-label="Conversation rail">
-          <div
-            ref={transcriptRef}
-            className="cs-transcript"
-            role="log"
-            aria-live="polite"
-            aria-label="Complete conversation transcript"
-            onScroll={handleTranscriptScroll}
-          >
-            {transcript.map((entry, index) => (
-              <article key={`${entry.speaker}-${index}`} className={`cs-transcript-entry cs-transcript-entry--${entry.speaker}`}>
-                <span className="cs-transcript-speaker">{entry.speaker === 'character' ? 'Friend' : 'You'}</span>
-                <p>{entry.text}</p>
-              </article>
-            ))}
+        {currentDialogue && (
+          <div className="cs-dialogue-card" role="status" aria-live="polite" aria-label="Current friend dialogue">
+            <div className="cs-dialogue-speaker" aria-hidden="true">Friend</div>
+            <div className="cs-dialogue-text">{currentDialogue.text}</div>
           </div>
-          {awayFromLatest && (
-            <button className="cs-latest-btn" onClick={scrollToLatest} aria-label="Show latest conversation exchange">
-              Latest
-            </button>
-          )}
-        </div>
+        )}
 
         {/* Closing panel */}
         {isClosing && closingMessage && (
@@ -888,6 +864,15 @@ export default function ConversationScene() {
       {/* How to play modal */}
       {showHowToPlay && <HowToPlayModal onClose={() => setShowHowToPlay(false)} />}
 
+      {showConversationLog && (
+        <ConversationLog
+          transcript={transcript}
+          assessments={assessments}
+          narrativeHistory={narrativeHistory}
+          onClose={() => setShowConversationLog(false)}
+        />
+      )}
+
       {/* Credits modal */}
       {showCredits && <CreditsModal onClose={() => setShowCredits(false)} />}
     </div>
@@ -897,6 +882,34 @@ export default function ConversationScene() {
 // ═══════════════════════════════════════════════════════
 // IMPACT REVEAL
 // ═══════════════════════════════════════════════════════
+function ConversationLog({ transcript, assessments, narrativeHistory, onClose }: { transcript: TranscriptEntry[]; assessments: TurnAssessment[]; narrativeHistory: TurnNarrativeMeta[]; onClose: () => void; }) {
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const [showDetails, setShowDetails] = useState(false);
+  const [copyStatus, setCopyStatus] = useState('');
+  const readable = formatConversationTranscript(transcript);
+  const debug = JSON.stringify({ transcript, assessments, narrativeHistory }, null, 2);
+  useEffect(() => {
+    closeRef.current?.focus();
+    const onKey = (event: globalThis.KeyboardEvent) => { if (event.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+  async function copy(text: string, label: string) { await navigator.clipboard.writeText(text); setCopyStatus(`${label} copied`); }
+  return (
+    <div className="cs-modal-backdrop cs-log-backdrop" role="dialog" aria-modal="true" aria-label="Conversation Log">
+      <section className="cs-conversation-log">
+        <header className="cs-log-header"><div><p className="cs-closing-eyebrow">Current conversation</p><h2>Conversation Log</h2></div><button ref={closeRef} className="cs-modal-close" onClick={onClose}>Close</button></header>
+        <div className="cs-log-transcript" role="log" aria-label="Complete chronological conversation">
+          {transcript.map((entry, index) => <article className="cs-log-entry" key={`${entry.speaker}-${index}`}><span>{entry.speaker === 'character' ? 'Friend' : 'You'}</span><p>{entry.text}</p></article>)}
+        </div>
+        <button className="cs-outcome-review-toggle" onClick={() => setShowDetails((value) => !value)} aria-expanded={showDetails}>Turn details</button>
+        {showDetails && <div className="cs-log-details">{assessments.map((assessment, index) => { const narrative = narrativeHistory[index]; return <p key={index}>Turn {index + 1}: {humanizeLabel(assessment.selectedIntent)} → {humanizeLabel(assessment.perceivedImpact)} ({humanizeLabel(assessment.alignment)}){narrative ? ` · ${humanizeLabel(narrative.sceneMove)} · ${narrative.providerSource ?? 'local'} ${narrative.latencyMs ?? 0}ms` : ''}</p>; })}</div>}
+        <footer className="cs-log-actions"><button className="cs-outcome-btn cs-outcome-btn--primary" onClick={() => void copy(readable, 'Transcript')}>Copy Transcript</button><button className="cs-outcome-btn" onClick={() => void copy(debug, 'Debug data')}>Copy Debug Data</button><span role="status" aria-live="polite">{copyStatus}</span></footer>
+      </section>
+    </div>
+  );
+}
+
 function ImpactReveal({
   selectedIntent,
   assessment,

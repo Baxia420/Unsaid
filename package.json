@@ -13,6 +13,8 @@
     "evaluate:live": "tsx scripts/evaluate-live.ts",
     "evaluate:mock": "tsx scripts/evaluate-deterministic.ts mock",
     "evaluate:recorded": "tsx scripts/evaluate-deterministic.ts recorded",
+    "evaluate:conversation:mock": "tsx scripts/evaluate-conversation.ts mock",
+    "evaluate:conversation:recorded": "tsx scripts/evaluate-conversation.ts recorded",
     "diagnose:live": "tsx scripts/diagnose-live.ts"
   },
   "dependencies": {

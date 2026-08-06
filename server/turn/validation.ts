@@ -35,6 +35,13 @@ export const TurnRequestSchema = z.object({
   recentTranscript: z
     .array(TranscriptEntrySchema)
     .max(SCENARIO.totalTurns * 2 + 1),
+  narrativeState: z.object({
+    revealedMemoryIds: z.array(z.string().max(64)).max(20),
+    recentSceneMoves: z.array(z.enum(['answer', 'react', 'ask', 'challenge', 'reveal_memory', 'recall_relationship', 'soften', 'set_boundary', 'withdraw'])).max(4),
+    activeBelief: z.enum(['i_did_not_matter', 'they_cared_but_failed_me', 'they_want_relief', 'repair_might_be_possible', 'i_am_not_ready']),
+    softeningEvidence: z.number().int().min(0).max(5),
+    unresolvedQuestion: z.string().max(240).nullable(),
+  }).optional(),
 });
 
 export type ValidatedTurnRequest = z.infer<typeof TurnRequestSchema>;

@@ -3,6 +3,7 @@ import { createInitialState, useGameStore } from '../src/game/store';
 import { SCENARIO } from '../src/game/scenario';
 import type { PlayerIntent, TurnAssessment, TurnResponse } from '../src/game/types';
 import { CLOSURES, makeAssessment, makeTurnResponse } from './helpers';
+import { createNarrativeState } from '../src/game/narrative';
 
 const postTurnMock = vi.hoisted(() => vi.fn());
 vi.mock('../src/lib/turnClient', () => ({ postTurn: postTurnMock }));
@@ -107,7 +108,7 @@ describe('submission safety', () => {
     enterPlaying(); prepareSubmission(); await state().submitTurn();
     expect(state()).toMatchObject({ input: '', selectedIntention: null, pendingMessage: null, pendingIntention: null, status: 'idle' });
   });
-  it('blocks a sixteenth turn', async () => {
+  it('blocks an eleventh turn', async () => {
     enterPlaying(); useGameStore.setState({ turnIndex: 10 }); prepareSubmission();
     await state().submitTurn(); expect(postTurnMock).not.toHaveBeenCalled();
   });
@@ -124,6 +125,17 @@ describe('failure, retry, and stale requests', () => {
     await state().submitTurn(); postTurnMock.mockResolvedValueOnce(makeTurnResponse());
     await state().retryTurn();
     expect(state().turnIndex).toBe(1); expect(state().transcript).toHaveLength(3); expect(state().assessments).toHaveLength(1);
+  });
+  it('failed turns do not record narrative state and retry records it once', async () => {
+    enterPlaying(); prepareSubmission(); postTurnMock.mockRejectedValueOnce(new Error('fail')); await state().submitTurn();
+    expect(state().narrativeHistory).toHaveLength(0);
+    const narrativeState = { ...createNarrativeState(), recentSceneMoves: ['answer' as const] };
+    postTurnMock.mockResolvedValueOnce(makeTurnResponse({ narrative: { state: narrativeState, meta: { sceneMove: 'answer', memoryId: null, activeBelief: narrativeState.activeBelief } } }));
+    await state().retryTurn(); expect(state().narrativeHistory).toHaveLength(1); expect(state().narrativeState.recentSceneMoves).toEqual(['answer']);
+  });
+  it('replay resets narrative state', () => {
+    useGameStore.setState({ narrativeState: { ...createNarrativeState(), revealedMemoryIds: ['empty_chair'] }, narrativeHistory: [{ sceneMove: 'reveal_memory', memoryId: 'empty_chair', activeBelief: 'i_did_not_matter' }] });
+    state().restart(); expect(state().narrativeState).toEqual(createNarrativeState()); expect(state().narrativeHistory).toEqual([]);
   });
   it('blocks simultaneous duplicate retry', async () => {
     enterPlaying(); prepareSubmission(); postTurnMock.mockRejectedValueOnce(new Error('fail')); await state().submitTurn();

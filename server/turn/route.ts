@@ -40,6 +40,7 @@ export function createTurnRouter(
 
     res.setHeader('X-Unsaid-Turn-Source', result.source);
     res.setHeader('X-Unsaid-Recovery-Used', String(result.recoveryUsed));
+    res.setHeader('X-Unsaid-Latency-Ms', String(result.latencyMs ?? 0));
     return res.status(200).json(result.response);
   });
 

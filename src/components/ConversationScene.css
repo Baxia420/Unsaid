@@ -2214,3 +2214,46 @@ html {
   .cs-table-foreground { height: 35%; }
   .cs-latest-btn { bottom: 20px; right: 28px; }
 }
+
+/* Restored cinematic gameplay composition. The former rail selectors are inert. */
+.cs-conversation-rail, .cs-latest-btn { display: none; }
+.cs-dialogue-card { width: min(820px, 62vw); max-height: min(22dvh, 190px); margin-bottom: 18px; padding: 13px 20px; overflow-y: auto; }
+.cs-dialogue-text { font-size: clamp(0.9rem, 1.25vw, 1rem); line-height: 1.55; }
+.cs-dialogue-speaker { margin-bottom: 4px; color: rgba(215,202,180,.5); font-size: .62rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+.cs-log-backdrop { z-index: 110; padding: 20px; }
+.cs-conversation-log { width: min(760px, 94vw); max-height: calc(100dvh - 40px); display: flex; flex-direction: column; gap: 12px; padding: 24px; box-sizing: border-box; border: 1px solid rgba(255,255,255,.12); border-radius: 14px; background: rgba(10,11,14,.98); box-shadow: 0 16px 60px rgba(0,0,0,.65); }
+.cs-log-header { display: flex; justify-content: space-between; align-items: start; gap: 16px; }
+.cs-log-header h2 { margin: 4px 0 0; font-weight: 300; }
+.cs-log-transcript { flex: 1; min-height: 180px; overflow-y: auto; overscroll-behavior: contain; padding: 4px 14px 4px 0; }
+.cs-log-entry { margin: 0 0 16px; }
+.cs-log-entry span { color: rgba(210,195,170,.5); font-size: .65rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
+.cs-log-entry p { margin: 4px 0 0; color: rgba(238,232,221,.9); line-height: 1.55; }
+.cs-log-details { max-height: 150px; overflow-y: auto; padding: 8px 12px; background: rgba(255,255,255,.025); }
+.cs-log-details p { margin: 5px 0; color: rgba(205,198,187,.65); font-size: .78rem; }
+.cs-log-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.cs-log-actions span { color: rgba(205,198,187,.6); font-size: .76rem; }
+@media (min-width: 900px) {
+  .cs-stage { margin-left: 0; padding-top: 44px; }
+  .cs-portrait-frame { left: 50%; bottom: 146px; width: min(380px, 40%); }
+  .cs-dock { position: relative; inset: auto; width: auto; max-height: none; min-height: var(--cs-dock-min); padding: 18px clamp(32px, 8%, 96px) 22px; border: 0; border-top: 1px solid var(--cs-dock-border); border-radius: 0; }
+  .cs-intent-btn { min-height: 80px; }
+  .cs-intent-desc { display: block; }
+}
+@media (max-width: 899px) {
+  .cs-root[data-app-mode="playing"], .cs-root[data-app-mode="closing"] { display: flex; height: 100dvh; min-height: 0; overflow: hidden; }
+  .cs-stage { display: flex; height: auto; min-height: 0; padding-top: 44px; overflow: hidden; }
+  .cs-dock { min-height: var(--cs-dock-min); }
+  .cs-portrait-frame { left: 50%; bottom: 118px; width: min(260px, 58%); }
+}
+@media (max-width: 599px) {
+  .cs-dialogue-card { width: calc(100% - 24px); max-height: 20dvh; margin-bottom: 10px; padding: 10px 14px; }
+  .cs-dialogue-text { font-size: .9rem; line-height: 1.5; }
+  .cs-portrait-frame { bottom: 112px; width: min(220px, 65%); height: 86%; }
+  .cs-hud { gap: 5px; padding: 6px 8px; }
+  .cs-hud-label { display: none; }
+  .cs-hud-turn { min-width: auto; font-size: .68rem; }
+  .cs-hud-bar-track { width: 34px; }
+  .cs-hud-pause-btn { min-height: 28px; padding: 4px 7px; font-size: .65rem; }
+  .cs-conversation-log { width: 100%; max-height: calc(100dvh - 20px); padding: 18px 16px; }
+  .cs-log-backdrop { padding: 10px; }
+}

@@ -68,6 +68,15 @@ export interface TurnRequest {
   selectedIntention: PlayerIntent;
   state: EmotionalState;
   recentTranscript: TranscriptEntry[];
+  narrativeState?: import('./narrative').NarrativeState;
+}
+
+export interface TurnNarrativeMeta {
+  sceneMove: import('./narrative').SceneMove;
+  memoryId: string | null;
+  activeBelief: import('./narrative').ActiveBelief;
+  providerSource?: string;
+  latencyMs?: number;
 }
 
 export interface TurnResponse {
@@ -75,6 +84,7 @@ export interface TurnResponse {
   assessment: Omit<TurnAssessment, 'selectedIntent' | 'alignment'>;
   presentation: { portraitState: PortraitState };
   finalClosures?: FinalClosures;
+  narrative?: { state: import('./narrative').NarrativeState; meta: TurnNarrativeMeta };
 }
 
 export interface ModelOutput {

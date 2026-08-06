@@ -8,7 +8,9 @@ import type {
   TranscriptEntry,
   TurnAssessment,
   TurnRequest,
+  TurnNarrativeMeta,
 } from './types';
+import { createNarrativeState, type NarrativeState } from './narrative';
 import { SCENARIO } from './scenario';
 import { applyTurn, derivePortraitState } from './state';
 import { classifyAlignment, evaluateOutcome } from './outcome';
@@ -28,6 +30,8 @@ interface GameData {
   transcript: TranscriptEntry[];
   turnIndex: number;
   assessments: TurnAssessment[];
+  narrativeState: NarrativeState;
+  narrativeHistory: TurnNarrativeMeta[];
   outcome: OutcomeDef | null;
   closingMessage: string | null;
   pendingMessage: string | null;
@@ -70,6 +74,8 @@ export function createInitialState(runId = 0): GameData {
     transcript: [],
     turnIndex: 0,
     assessments: [],
+    narrativeState: createNarrativeState(),
+    narrativeHistory: [],
     outcome: null,
     closingMessage: null,
     pendingMessage: null,
@@ -107,6 +113,7 @@ async function executeTurn(
       tension: initialState.tension,
     },
     recentTranscript: initialState.transcript,
+    narrativeState: initialState.narrativeState,
   };
 
   set({ activeRequestId: requestId });
@@ -146,6 +153,8 @@ async function executeTurn(
       portraitState: nextState.portraitState,
       transcript,
       assessments,
+      narrativeState: response.narrative?.state ?? current.narrativeState,
+      narrativeHistory: response.narrative ? [...current.narrativeHistory, response.narrative.meta] : current.narrativeHistory,
       turnIndex,
       input: '',
       selectedIntention: null,

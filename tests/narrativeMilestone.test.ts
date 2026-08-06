@@ -175,33 +175,25 @@ describe('natural dynamic-conversation prompt', () => {
     ],
   })).system;
 
-  it('contains the full canon and gradual private memories', () => {
-    for (const phrase of ['first public photography exhibition', 'six invited guests', 'helped choose', 'empty chair', 'checked the door', 'defended the player', 'packed up', 'missed the player', 'friendship to survive']) {
-      expect(prompt).toContain(phrase);
-    }
-    expect(prompt).toContain('reveal gradually');
-    expect(prompt).toContain('not a fixed-turn sequence');
+  it('contains compact chronology without the full private-memory catalogue', () => {
+    for (const phrase of ['first public photography exhibition', 'six invited guests', 'helped choose', 'three weeks ago', 'not discussed for nine years']) expect(prompt).toContain(phrase);
+    expect(prompt).not.toContain('empty chair');
   });
 
   it('requires natural length, direct response, emotional movement, and varied openings', () => {
-    for (const phrase of ['Match the response length', 'respond directly', 'private memory has been revealed', 'Vary sentence length', 'guarded, then honest, then painful, then vulnerable, then uncertain']) {
-      expect(prompt).toContain(phrase);
-    }
+    for (const phrase of ['TURN DIRECTIVE', 'Primary move:', 'Address first:', 'never pad to a minimum', 'natural, restrained dialogue']) expect(prompt).toContain(phrase);
   });
 
   it('keeps every intention viable and supports resolution and recovery', () => {
-    expect(prompt).toContain('Every selected intention—understand, acknowledge, explain, and repair—can help or harm');
-    expect(prompt).toContain('repaired misunderstandings');
-    expect(prompt).toContain('do not invent accusations');
-    expect(prompt).toContain('Recovery is possible');
-    expect(prompt).toContain('without instant forgiveness');
+    expect(prompt).toContain('Explanations and repair attempts are not automatically defensive or pressuring');
+    expect(prompt).toContain('invent accusations');
+    expect(prompt).toContain('can soften without forgiving');
   });
 
   it('forbids clinical language and makes assessment reasons address You', () => {
     for (const term of ['emotional labor', 'accountability framework', 'intent versus impact', 'holding space', 'processing', 'communication pattern']) {
       expect(prompt).toContain(term);
     }
-    expect(prompt).toContain('Address the speaker as "You"');
-    expect(prompt).toContain('never say "The player"');
+    expect(prompt).toContain('addressed to "You"');
   });
 });

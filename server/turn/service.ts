@@ -3,6 +3,7 @@ import { applyTurn, derivePortraitState } from '../../src/game/state';
 import { SCENARIO } from '../../src/game/scenario';
 import type { ModelAdapter } from '../adapters/ModelAdapter';
 import { ModelOutputSchema, type ValidatedModelOutput } from './schema';
+import { advanceNarrativeState, createTurnDirective, type TurnDirective } from './directive';
 
 export interface CategorizedError {
   category: string;
@@ -105,11 +106,12 @@ export async function processTurnDetailed(
   primaryAdapter: ModelAdapter,
   recoveryAdapter?: ModelAdapter
 ): Promise<TurnExecutionResult> {
+  const directive = createTurnDirective(request);
   const primary = await generateWithDiagnostics(request, primaryAdapter, 'gemini');
 
   if (primary.output) {
     return {
-      response: makeResponse(request, primary.output),
+      response: makeResponse(request, primary.output, directive),
       source: 'gemini',
       recoveryUsed: false,
       latencyMs: primary.latencyMs,
@@ -120,7 +122,7 @@ export async function processTurnDetailed(
     const recovery = await generateWithDiagnostics(request, recoveryAdapter, 'recorded-recovery');
     if (recovery.output) {
       return {
-        response: makeResponse(request, recovery.output),
+        response: makeResponse(request, recovery.output, directive),
         source: 'recorded-recovery',
         recoveryUsed: true,
         failureCategory: primary.error?.category,
@@ -154,7 +156,8 @@ export async function processTurn(
 
 function makeResponse(
   request: TurnRequest,
-  output: ValidatedModelOutput
+  output: ValidatedModelOutput,
+  directive: TurnDirective = createTurnDirective(request)
 ): TurnResponse {
   const currentState = {
     ...request.state,
@@ -179,6 +182,14 @@ function makeResponse(
       tensionDelta: output.tensionDelta,
     },
     presentation: { portraitState: nextState.portraitState },
+    narrative: {
+      state: advanceNarrativeState(request, directive),
+      meta: {
+        sceneMove: directive.primaryMove,
+        memoryId: directive.offeredMemory?.id ?? null,
+        activeBelief: advanceNarrativeState(request, directive).activeBelief,
+      },
+    },
     ...(isFinalTurn
       ? { finalClosures: output.finalClosures ?? SCENARIO.fallbackClosures }
       : {}),

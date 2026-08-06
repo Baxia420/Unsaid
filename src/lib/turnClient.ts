@@ -24,7 +24,13 @@ export async function postTurn(request: TurnRequest): Promise<TurnResponse> {
   }
 
   try {
-    return (await response.json()) as TurnResponse;
+    const result = (await response.json()) as TurnResponse;
+    if (result.narrative) {
+      result.narrative.meta.providerSource = response.headers.get('X-Unsaid-Turn-Source') ?? undefined;
+      const latency = Number(response.headers.get('X-Unsaid-Latency-Ms'));
+      if (Number.isFinite(latency)) result.narrative.meta.latencyMs = latency;
+    }
+    return result;
   } catch {
     throw new TurnClientError('Invalid response from server. Please try again.');
   }
