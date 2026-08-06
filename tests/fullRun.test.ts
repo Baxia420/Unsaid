@@ -88,11 +88,11 @@ describe('complete deterministic runs', () => {
   it.each([
     ['mock', new MockModelAdapter()],
     ['recorded', new RecordedModelAdapter()],
-  ] as const)('completes a 15-turn %s run with one response per turn', async (_name, adapter) => {
+  ] as const)('completes a 10-turn %s run with one response per turn', async (_name, adapter) => {
     const result = await completeRun(adapter);
-    expect(result.transcript.filter((entry) => entry.speaker === 'player')).toHaveLength(15);
-    expect(result.transcript.filter((entry) => entry.speaker === 'character')).toHaveLength(16);
-    expect(result.assessments).toHaveLength(15);
+    expect(result.transcript.filter((entry) => entry.speaker === 'player')).toHaveLength(10);
+    expect(result.transcript.filter((entry) => entry.speaker === 'character')).toHaveLength(11);
+    expect(result.assessments).toHaveLength(10);
     expect(result.finalClosures).toBeDefined();
     expect(['even', 'smoothed', 'the_speech']).toContain(result.outcome);
   });

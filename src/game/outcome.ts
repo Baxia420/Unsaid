@@ -57,7 +57,7 @@ export function evaluateOutcome(inputs: OutcomeInputs): OutcomeId {
     .slice(-4)
     .filter((assessment) => HARMFUL_IMPACTS.has(assessment.perceivedImpact)).length;
   const lateRepairCount = assessments
-    .slice(-5)
+    .slice(-4)
     .filter(
       (assessment) =>
         assessment.perceivedImpact === 'repair' ||
@@ -65,7 +65,7 @@ export function evaluateOutcome(inputs: OutcomeInputs): OutcomeId {
     ).length;
 
   if (
-    harmfulCount >= 6 ||
+    harmfulCount >= 4 ||
     lateHarmCount >= 3 ||
     (finalTension >= 7 && finalEngagement <= -2)
   ) {
@@ -73,9 +73,9 @@ export function evaluateOutcome(inputs: OutcomeInputs): OutcomeId {
   }
 
   if (
-    constructiveCount >= 7 &&
-    alignedCount >= 4 &&
-    finalEngagement >= 2 &&
+    constructiveCount >= 5 &&
+    alignedCount >= 3 &&
+    finalEngagement > 0 &&
     finalTension <= 5 &&
     lateRepairCount >= 2
   ) {

@@ -393,8 +393,8 @@ describe('24. HUD displays turn count', () => {
     expect(COMPONENT).toContain('SCENARIO.totalTurns');
   });
 
-  it('scenario totalTurns is 15', () => {
-    expect(SCENARIO.totalTurns).toBe(15);
+  it('scenario totalTurns is 10', () => {
+    expect(SCENARIO.totalTurns).toBe(10);
   });
 });
 

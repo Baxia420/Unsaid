@@ -11,6 +11,8 @@
     "test": "vitest run",
     "preview": "vite preview",
     "evaluate:live": "tsx scripts/evaluate-live.ts",
+    "evaluate:mock": "tsx scripts/evaluate-deterministic.ts mock",
+    "evaluate:recorded": "tsx scripts/evaluate-deterministic.ts recorded",
     "diagnose:live": "tsx scripts/diagnose-live.ts"
   },
   "dependencies": {

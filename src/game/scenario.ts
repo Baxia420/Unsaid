@@ -10,7 +10,7 @@ export const SCENARIO = {
   title: 'UNSAID',
   description: 'A difficult café conversation after a broken promise.',
   openingLine: 'You said you wanted to talk.',
-  totalTurns: 15,
+  totalTurns: 10,
   maxPlayerTextLength: 500,
   startingState: { engagement: -3, tension: 1 },
   bounds: {
@@ -87,7 +87,7 @@ export const SCENARIO = {
     even:
       "I don't know if we're okay yet. But this is the first time in weeks that this has felt honest.",
     smoothed: "I think it's best if we finish our drinks and leave it here for today.",
-    the_speech: "I don't have anything else to give you right now. I think we should go.",
+    the_speech: "You do not have to make this easier for me. I can sit with what I did; you do not need to comfort me before you leave.",
   } as FinalClosures,
   outcomes: {
     even: {

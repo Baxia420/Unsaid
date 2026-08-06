@@ -18,7 +18,7 @@ function generateDeterministicOutput(request: TurnRequest): ModelOutput {
 
   if (/forgive|move on|fine now|say we're okay/.test(text)) {
     return withFinalClosures(request, {
-      characterText: "Please don't ask me to make this comfortable for you.",
+      characterText: "Please don't ask me to make this comfortable for you. I am already trying to manage how you feel about it.",
       perceivedImpact: 'pressure',
       impactReason: 'The request put the burden of relief back on them.',
       engagementDelta: -2,
@@ -63,7 +63,7 @@ function generateDeterministicOutput(request: TurnRequest): ModelOutput {
   }
   if (/what hurt|tell me|listen|why were you/.test(text)) {
     return withFinalClosures(request, {
-      characterText: 'I kept looking at the door because you said you would be there.',
+      characterText: 'I kept looking at the door because you said you would be there. Every time it opened, I thought maybe you had changed your mind about leaving me alone in it.',
       perceivedImpact: 'understanding',
       impactReason: 'The question made room for their experience.',
       engagementDelta: 2,

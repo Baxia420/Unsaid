@@ -39,19 +39,19 @@ describe('turn service', () => {
     expect(broken.generateTurn).toHaveBeenCalledOnce();
   });
   it('returns no closures on ordinary turns', async () => {
-    expect((await processTurn(makeRequest({ turnIndex: 13 }), adapter(makeModelOutput({ finalClosures: CLOSURES })))).finalClosures).toBeUndefined();
+    expect((await processTurn(makeRequest({ turnIndex: 8 }), adapter(makeModelOutput({ finalClosures: CLOSURES })))).finalClosures).toBeUndefined();
   });
-  it('returns validated closures on turn 15', async () => {
-    const result = await processTurn(makeRequest({ turnIndex: 14 }), adapter(makeModelOutput({ finalClosures: CLOSURES })));
+  it('returns validated closures on turn 10', async () => {
+    const result = await processTurn(makeRequest({ turnIndex: 9 }), adapter(makeModelOutput({ finalClosures: CLOSURES })));
     expect(result.finalClosures).toEqual(CLOSURES);
   });
-  it('uses fallback closures when turn-15 closures are missing', async () => {
-    const result = await processTurn(makeRequest({ turnIndex: 14 }), adapter(makeModelOutput()));
+  it('uses fallback closures when turn-10 closures are missing', async () => {
+    const result = await processTurn(makeRequest({ turnIndex: 9 }), adapter(makeModelOutput()));
     expect(result.finalClosures).toEqual(SCENARIO.fallbackClosures);
   });
   it('makes only one model request for a valid final turn', async () => {
     const primary = adapter(makeModelOutput({ finalClosures: CLOSURES }));
-    await processTurn(makeRequest({ turnIndex: 14 }), primary);
+    await processTurn(makeRequest({ turnIndex: 9 }), primary);
     expect(primary.generateTurn).toHaveBeenCalledOnce();
   });
   it('derives portrait after clamped state application', async () => {

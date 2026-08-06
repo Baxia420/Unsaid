@@ -108,7 +108,7 @@ describe('submission safety', () => {
     expect(state()).toMatchObject({ input: '', selectedIntention: null, pendingMessage: null, pendingIntention: null, status: 'idle' });
   });
   it('blocks a sixteenth turn', async () => {
-    enterPlaying(); useGameStore.setState({ turnIndex: 15 }); prepareSubmission();
+    enterPlaying(); useGameStore.setState({ turnIndex: 10 }); prepareSubmission();
     await state().submitTurn(); expect(postTurnMock).not.toHaveBeenCalled();
   });
 });
@@ -149,11 +149,11 @@ describe('failure, retry, and stale requests', () => {
   });
 });
 
-describe('turn-15 closing and outcome flow', () => {
+describe('turn-10 closing and outcome flow', () => {
   beforeEach(() => {
     enterPlaying();
-    const assessments: TurnAssessment[] = Array.from({ length: 14 }, () => makeAssessment('repair', 'repair'));
-    useGameStore.setState({ turnIndex: 14, assessments, engagement: 8, tension: 0 });
+    const assessments: TurnAssessment[] = Array.from({ length: 9 }, () => makeAssessment('repair', 'repair'));
+    useGameStore.setState({ turnIndex: 9, assessments, engagement: 8, tension: 0 });
     postTurnMock.mockResolvedValue(makeTurnResponse({ finalClosures: CLOSURES, assessment: { perceivedImpact: 'repair', impactReason: 'It left room.', engagementDelta: 1, tensionDelta: -1 } }));
     prepareSubmission('I will respect your boundary.', 'repair');
   });

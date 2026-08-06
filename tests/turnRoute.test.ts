@@ -25,7 +25,7 @@ describe('turn route validation', () => {
     ['missing intention', (body: Record<string, unknown>) => delete body.selectedIntention],
     ['invalid intention', (body: Record<string, unknown>) => { body.selectedIntention = 'defend'; }],
     ['invalid scenario', (body: Record<string, unknown>) => { body.scenarioId = 'other'; }],
-    ['out-of-range turn', (body: Record<string, unknown>) => { body.turnIndex = 15; }],
+    ['out-of-range turn', (body: Record<string, unknown>) => { body.turnIndex = 10; }],
     ['oversized input', (body: Record<string, unknown>) => { body.playerText = 'x'.repeat(SCENARIO.maxPlayerTextLength + 1); }],
     ['malformed state', (body: Record<string, unknown>) => { body.state = { engagement: 'bad', tension: 0 }; }],
     ['malformed transcript', (body: Record<string, unknown>) => { body.recentTranscript = [{ speaker: 'other', text: '' }]; }],

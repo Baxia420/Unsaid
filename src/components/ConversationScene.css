@@ -2158,3 +2158,59 @@ html {
     padding: 28px 24px;
   }
 }
+
+/* Conversation rail: the dialogue belongs beside the café, never over the portrait. */
+.cs-conversation-rail {
+  position: fixed;
+  z-index: 25;
+  top: 61px;
+  left: clamp(14px, 2vw, 28px);
+  bottom: 224px;
+  width: clamp(360px, 36vw, 480px);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  pointer-events: none;
+}
+
+.cs-transcript {
+  min-height: 0;
+  height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 14px 14px 18px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 12px;
+  background: rgba(10, 11, 14, 0.78);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.32);
+  backdrop-filter: blur(14px);
+  pointer-events: auto;
+}
+
+.cs-transcript-entry { margin: 0 0 16px; max-width: 94%; }
+.cs-transcript-entry:last-child { margin-bottom: 0; }
+.cs-transcript-entry--player { margin-left: auto; text-align: right; }
+.cs-transcript-speaker { display: block; margin-bottom: 4px; color: rgba(215, 202, 180, 0.5); font-size: 0.63rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; }
+.cs-transcript-entry--player .cs-transcript-speaker { color: rgba(151, 190, 210, 0.64); }
+.cs-transcript-entry p { margin: 0; color: rgba(237, 232, 223, 0.92); font-size: 0.92rem; line-height: 1.55; }
+.cs-transcript-entry--player p { color: rgba(205, 220, 229, 0.9); }
+.cs-latest-btn { position: absolute; right: 14px; bottom: 14px; padding: 7px 12px; border: 1px solid rgba(255,255,255,.16); border-radius: 999px; background: rgba(20, 23, 28, .96); color: rgba(240,235,225,.9); font: 600 .72rem var(--cs-font); cursor: pointer; }
+
+@media (min-width: 900px) {
+  .cs-stage { margin-left: clamp(390px, 38vw, 520px); padding-top: 44px; }
+  .cs-portrait-frame { left: 58%; width: min(460px, 52%); }
+  .cs-dock { position: fixed; z-index: 26; left: clamp(14px, 2vw, 28px); bottom: 0; width: clamp(360px, 36vw, 480px); min-height: 0; max-height: 215px; box-sizing: border-box; padding: 12px 14px 16px; border: 1px solid rgba(255,255,255,.09); border-bottom: 0; border-radius: 12px 12px 0 0; }
+  .cs-intent-btn { min-height: 64px; }
+  .cs-intent-desc { display: none; }
+}
+
+@media (max-width: 899px) {
+  .cs-root[data-app-mode="playing"], .cs-root[data-app-mode="closing"] { display: block; min-height: 100dvh; height: auto; overflow-x: hidden; overflow-y: auto; }
+  .cs-stage { display: block; height: auto; min-height: 300px; padding-top: 44px; overflow: visible; }
+  .cs-conversation-rail { position: relative; inset: auto; width: auto; height: min(34dvh, 300px); margin-top: calc(40dvh - 44px); padding: 12px 16px 0; box-sizing: border-box; pointer-events: auto; background: var(--cs-dock-bg); }
+  .cs-transcript { height: 100%; box-sizing: border-box; }
+  .cs-dock { min-height: 0; padding: 12px 16px max(16px, env(safe-area-inset-bottom)); }
+  .cs-portrait-frame { width: min(260px, 58%); left: 62%; }
+  .cs-table-foreground { height: 35%; }
+  .cs-latest-btn { bottom: 20px; right: 28px; }
+}

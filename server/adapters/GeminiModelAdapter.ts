@@ -1,6 +1,7 @@
 import type { TurnRequest } from '../../src/game/types';
 import type { ModelAdapter } from './ModelAdapter';
 import { buildLivePrompt } from '../turn/prompt';
+import { SCENARIO } from '../../src/game/scenario';
 
 const IMPACT_VALUES = [
   'understanding',
@@ -112,7 +113,7 @@ export class GeminiModelAdapter implements ModelAdapter {
       generationConfig: {
         maxOutputTokens: 1400,
         responseMimeType: 'application/json',
-        responseSchema: createResponseSchema(request.turnIndex === 14),
+        responseSchema: createResponseSchema(request.turnIndex === SCENARIO.totalTurns - 1),
       },
     };
 

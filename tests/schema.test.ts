@@ -61,10 +61,10 @@ describe('model output schema', () => {
 });
 
 describe('turn request schema', () => {
-  it.each([0, 1, 13, 14])('accepts turn index %s', (turnIndex) => {
+  it.each([0, 1, 8, 9])('accepts turn index %s', (turnIndex) => {
     expect(TurnRequestSchema.safeParse(makeRequest({ turnIndex })).success).toBe(true);
   });
-  it.each([-1, 15, 1.2])('rejects turn index %s', (turnIndex) => {
+  it.each([-1, 10, 1.2])('rejects turn index %s', (turnIndex) => {
     expect(TurnRequestSchema.safeParse(makeRequest({ turnIndex })).success).toBe(false);
   });
   it('rejects missing intention', () => {
@@ -78,12 +78,12 @@ describe('turn request schema', () => {
   it('rejects oversized player input', () => {
     expect(TurnRequestSchema.safeParse(makeRequest({ playerText: 'x'.repeat(SCENARIO.maxPlayerTextLength + 1) })).success).toBe(false);
   });
-  it('supports a complete 15-turn transcript', () => {
+  it('supports a complete 10-turn transcript', () => {
     const recentTranscript = Array.from({ length: 31 }, (_, index) => ({
       speaker: index % 2 ? ('player' as const) : ('character' as const),
       text: `Line ${index}`,
     }));
-    expect(TurnRequestSchema.safeParse(makeRequest({ turnIndex: 14, recentTranscript })).success).toBe(true);
+    expect(TurnRequestSchema.safeParse(makeRequest({ turnIndex: 9, recentTranscript: recentTranscript.slice(0, 20) })).success).toBe(true);
   });
   it('rejects a transcript beyond the full-run bound', () => {
     const recentTranscript = Array.from({ length: 32 }, () => ({ speaker: 'player' as const, text: 'x' }));

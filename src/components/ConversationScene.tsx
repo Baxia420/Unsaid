@@ -141,12 +141,13 @@ export default function ConversationScene() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [hintOpen, setHintOpen] = useState(false);
   const [showReview, setShowReview] = useState(false);
+  const transcriptRef = useRef<HTMLDivElement>(null);
+  const [awayFromLatest, setAwayFromLatest] = useState(false);
   const reducedMotion = useReducedMotion();
 
   // ── Derived values ───────────────────────────────────
   const connPct = Math.round(((engagement + 10) / 20) * 100);
   const presPct = Math.round(((tension + 10) / 20) * 100);
-  const currentDialogue = [...transcript].reverse().find((entry) => entry.speaker === 'character');
   const portrait = portraitState ?? 'distant';
   const open = ['connected', 'hurt_exposed'].includes(portrait);
 
@@ -272,6 +273,19 @@ export default function ConversationScene() {
     }
   }
 
+  const scrollToLatest = useCallback(() => {
+    const element = transcriptRef.current;
+    if (!element) return;
+    element.scrollTo({ top: element.scrollHeight, behavior: reducedMotion ? 'auto' : 'smooth' });
+    setAwayFromLatest(false);
+  }, [reducedMotion]);
+
+  const handleTranscriptScroll = useCallback(() => {
+    const element = transcriptRef.current;
+    if (!element) return;
+    setAwayFromLatest(element.scrollHeight - element.scrollTop - element.clientHeight > 48);
+  }, []);
+
   // ── Effects ──────────────────────────────────────────
   useEffect(() => {
     if (prevTurnIndex.current !== turnIndex) {
@@ -327,6 +341,12 @@ export default function ConversationScene() {
       setHintOpen(false);
     }
   }, [turnIndex]);
+
+  useEffect(() => {
+    const element = transcriptRef.current;
+    if (!element || awayFromLatest) return;
+    element.scrollTop = element.scrollHeight;
+  }, [transcript.length, awayFromLatest]);
 
   // Prologue keyboard
   useEffect(() => {
@@ -669,20 +689,28 @@ export default function ConversationScene() {
         {/* Table foreground */}
         <div className="cs-table-foreground" />
 
-        {/* Dialogue */}
-        {currentDialogue && (
+        <div className="cs-conversation-rail" aria-label="Conversation rail">
           <div
-            className="cs-dialogue-card"
+            ref={transcriptRef}
+            className="cs-transcript"
             role="log"
             aria-live="polite"
-            aria-label="Dialogue"
+            aria-label="Complete conversation transcript"
+            onScroll={handleTranscriptScroll}
           >
-            <div className="cs-dialogue-speaker" aria-hidden="true">
-              {currentDialogue.speaker === 'character' ? 'Friend' : 'You'}
-            </div>
-            <div className="cs-dialogue-text">{currentDialogue.text}</div>
+            {transcript.map((entry, index) => (
+              <article key={`${entry.speaker}-${index}`} className={`cs-transcript-entry cs-transcript-entry--${entry.speaker}`}>
+                <span className="cs-transcript-speaker">{entry.speaker === 'character' ? 'Friend' : 'You'}</span>
+                <p>{entry.text}</p>
+              </article>
+            ))}
           </div>
-        )}
+          {awayFromLatest && (
+            <button className="cs-latest-btn" onClick={scrollToLatest} aria-label="Show latest conversation exchange">
+              Latest
+            </button>
+          )}
+        </div>
 
         {/* Closing panel */}
         {isClosing && closingMessage && (

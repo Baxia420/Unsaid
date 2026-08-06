@@ -9,7 +9,7 @@ const ROOT = resolve(__dirname, '..');
 const STORE_SOURCE = readFileSync(resolve(ROOT, 'src/game/store.ts'), 'utf8');
 
 describe('dynamic gameplay contract', () => {
-  it('allows exactly 15 committed turns', () => expect(SCENARIO.totalTurns).toBe(15));
+  it('allows exactly 10 committed turns', () => expect(SCENARIO.totalTurns).toBe(10));
   it('owns the prologue in scenario data', () => {
     expect(SCENARIO.prologue.join(' ')).toContain('nine years');
     expect(SCENARIO.prologue.join(' ')).toContain('first public photography exhibition');
@@ -76,12 +76,17 @@ describe('dynamic production prompt', () => {
       expect(prompt.system).toContain(term);
     }
   });
-  it('does not request closures before turn 15', () => {
+  it('does not request closures before turn 10', () => {
     expect(prompt.system).toContain('Do not return finalClosures on this turn.');
   });
-  it('requests all three closures on turn 15 without model outcome selection', () => {
-    const finalPrompt = buildLivePrompt(makeRequest({ turnIndex: 14 }));
+  it('requests all three closures on turn 10 without model outcome selection', () => {
+    const finalPrompt = buildLivePrompt(makeRequest({ turnIndex: 9 }));
     expect(finalPrompt.system).toContain('even, smoothed, and the_speech');
     expect(finalPrompt.system).toContain('Do not choose an outcome');
+  });
+  it('does not impose a minimum response length', () => {
+    expect(prompt.system).not.toContain('45 to 100 words');
+    expect(prompt.system).not.toContain('3 to 6 sentences');
+    expect(prompt.system).toContain('Match the response length');
   });
 });

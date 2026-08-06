@@ -89,12 +89,12 @@ describe('local Read the room observation', () => {
     const guarded = generateReadTheRoomHint({
       engagement: -5, tension: 2, selectedIntention: null,
       lastPerceivedImpact: null, lastAlignment: null,
-      turnIndex: 1, totalTurns: 15, recentAssessments: [],
+      turnIndex: 1, totalTurns: 10, recentAssessments: [],
     });
     const softening = generateReadTheRoomHint({
       engagement: 4, tension: 1, selectedIntention: 'acknowledge',
       lastPerceivedImpact: 'acknowledgment', lastAlignment: 'aligned',
-      turnIndex: 7, totalTurns: 15, recentAssessments: [assessment],
+      turnIndex: 7, totalTurns: 10, recentAssessments: [assessment],
     });
     expect(guarded).not.toBe(softening);
     expect(useGameStore.getState()).toEqual(before);
@@ -184,7 +184,7 @@ describe('natural dynamic-conversation prompt', () => {
   });
 
   it('requires natural length, direct response, emotional movement, and varied openings', () => {
-    for (const phrase of ['3 to 6 sentences', '45 to 100 words', 'responding to what was just said', 'concrete feeling, memory, or consequence', 'Vary sentence length', 'guarded, then honest, then painful, then vulnerable, then uncertain']) {
+    for (const phrase of ['Match the response length', 'respond directly', 'private memory has been revealed', 'Vary sentence length', 'guarded, then honest, then painful, then vulnerable, then uncertain']) {
       expect(prompt).toContain(phrase);
     }
   });

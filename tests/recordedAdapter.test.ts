@@ -14,14 +14,14 @@ describe('recorded adapter', () => {
     const output = ModelOutputSchema.parse(await new RecordedModelAdapter().generateTurn(makeRequest({ turnIndex })));
     expect(output.finalClosures).toBeUndefined();
   });
-  it('returns closures on turn 15', async () => {
-    const output = ModelOutputSchema.parse(await new RecordedModelAdapter().generateTurn(makeRequest({ turnIndex: 14 })));
+  it('returns closures on turn 10', async () => {
+    const output = ModelOutputSchema.parse(await new RecordedModelAdapter().generateTurn(makeRequest({ turnIndex: 9 })));
     expect(output.finalClosures).toBeDefined();
   });
   it('supports two independent complete runs without state leakage', async () => {
     async function run() {
       const adapter = new RecordedModelAdapter();
-      return Promise.all(Array.from({ length: 15 }, (_, turnIndex) => adapter.generateTurn(makeRequest({ turnIndex }))));
+      return Promise.all(Array.from({ length: 10 }, (_, turnIndex) => adapter.generateTurn(makeRequest({ turnIndex }))));
     }
     expect(await run()).toEqual(await run());
   });

@@ -24,14 +24,14 @@ describe('mock adapter', () => {
     expect(result.perceivedImpact).toBe(impact);
     expect(result.impactReason.length).toBeGreaterThan(0);
   });
-  it('returns closures only on turn 15', async () => {
+  it('returns closures only on turn 10', async () => {
     const adapter = new MockModelAdapter();
     expect(ModelOutputSchema.parse(await adapter.generateTurn(makeRequest())).finalClosures).toBeUndefined();
-    expect(ModelOutputSchema.parse(await adapter.generateTurn(makeRequest({ turnIndex: 14 }))).finalClosures).toBeDefined();
+    expect(ModelOutputSchema.parse(await adapter.generateTurn(makeRequest({ turnIndex: 9 }))).finalClosures).toBeDefined();
   });
-  it('supports a complete 15-turn run', async () => {
+  it('supports a complete 10-turn run', async () => {
     const adapter = new MockModelAdapter();
-    for (let turnIndex = 0; turnIndex < 15; turnIndex += 1) {
+    for (let turnIndex = 0; turnIndex < 10; turnIndex += 1) {
       expect(ModelOutputSchema.safeParse(await adapter.generateTurn(makeRequest({ turnIndex }))).success).toBe(true);
     }
   });

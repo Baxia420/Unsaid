@@ -75,10 +75,10 @@ describe('Gemini adapter request construction', () => {
     expect(schema.properties.finalClosures).toBeUndefined();
     expect(schema.required).not.toContain('finalClosures');
   });
-  it('includes finalClosures in turn-15 schema', async () => {
+  it('includes finalClosures in turn-10 schema', async () => {
     const fetchMock = vi.fn().mockResolvedValue(providerResponse(makeModelOutput()));
     vi.stubGlobal('fetch', fetchMock);
-    await new GeminiModelAdapter().generateTurn(makeRequest({ turnIndex: 14 }));
+    await new GeminiModelAdapter().generateTurn(makeRequest({ turnIndex: 9 }));
     const schema = JSON.parse(fetchMock.mock.calls[0][1].body).generationConfig.responseSchema;
     expect(schema.properties.finalClosures).toBeDefined();
     expect(schema.required).toContain('finalClosures');
