@@ -5,8 +5,17 @@
   "outputDirectory": "dist",
   "rewrites": [
     {
+      "source": "/api/(.*)",
+      "destination": "/api"
+    },
+    {
       "source": "/((?!api(?:/|$)).*)",
       "destination": "/index.html"
     }
-  ]
+  ],
+  "env": {
+    "UNSAID_AI_MODE": "live",
+    "UNSAID_LIVE_RECOVERY": "none",
+    "GEMINI_MODEL": "gemini-3.5-flash-lite"
+  }
 }

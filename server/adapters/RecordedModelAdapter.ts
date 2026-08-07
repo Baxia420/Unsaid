@@ -1,6 +1,6 @@
-import type { ModelAdapter } from './ModelAdapter.ts';
-import type { TurnRequest } from '../../src/game/types.ts';
-import { MockModelAdapter } from './MockModelAdapter.ts';
+import type { ModelAdapter } from './ModelAdapter.js';
+import type { TurnRequest } from '../../src/game/types.js';
+import { MockModelAdapter } from './MockModelAdapter.js';
 
 /**
  * Deterministic demo-safe adapter. It owns no mutable run state and performs

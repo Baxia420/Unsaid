@@ -1,11 +1,11 @@
 import express, { ErrorRequestHandler } from 'express';
-import { createTurnRouter } from './turn/route.ts';
+import { createTurnRouter } from './turn/route.js';
 import {
   createModelAdapter,
   createRecoveryAdapter,
   getRuntimeMode,
   getLiveRecovery,
-} from './adapters/factory.ts';
+} from './adapters/factory.js';
 
 const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
   if (err instanceof SyntaxError && 'body' in err) {

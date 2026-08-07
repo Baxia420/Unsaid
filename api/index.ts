@@ -1,4 +1,4 @@
-import { createApp } from '../server/index.ts';
+import { createApp } from '../server/index.js';
 
 export default createApp();
 

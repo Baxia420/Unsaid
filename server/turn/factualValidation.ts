@@ -1,5 +1,5 @@
-import type { FinalClosures } from '../../src/game/types.ts';
-import type { ValidatedModelOutput } from './schema.ts';
+import type { FinalClosures } from '../../src/game/types.js';
+import type { ValidatedModelOutput } from './schema.js';
 
 export type FactualIssueCode =
   | 'INVENTED_CHAIR_SELECTION'

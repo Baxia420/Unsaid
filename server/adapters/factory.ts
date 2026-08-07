@@ -1,7 +1,7 @@
-import { MockModelAdapter } from './MockModelAdapter.ts';
-import { GeminiModelAdapter } from './GeminiModelAdapter.ts';
-import { RecordedModelAdapter } from './RecordedModelAdapter.ts';
-import type { ModelAdapter } from './ModelAdapter.ts';
+import { MockModelAdapter } from './MockModelAdapter.js';
+import { GeminiModelAdapter } from './GeminiModelAdapter.js';
+import { RecordedModelAdapter } from './RecordedModelAdapter.js';
+import type { ModelAdapter } from './ModelAdapter.js';
 
 export function createModelAdapter(): ModelAdapter {
   const mode = process.env.UNSAID_AI_MODE;

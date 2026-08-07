@@ -1,11 +1,11 @@
-import type { TurnRequest, TurnResponse } from '../../src/game/types.ts';
-import { applyTurn, derivePortraitState } from '../../src/game/state.ts';
-import { SCENARIO } from '../../src/game/scenario.ts';
-import type { ModelAdapter } from '../adapters/ModelAdapter.ts';
-import { ModelOutputSchema, type ValidatedModelOutput } from './schema.ts';
-import { advanceNarrativeState, createTurnDirective, type TurnDirective } from './directive.ts';
-import { findFactualIssues } from './factualValidation.ts';
-import { createNarrativeState } from '../../src/game/narrative.ts';
+import type { TurnRequest, TurnResponse } from '../../src/game/types.js';
+import { applyTurn, derivePortraitState } from '../../src/game/state.js';
+import { SCENARIO } from '../../src/game/scenario.js';
+import type { ModelAdapter } from '../adapters/ModelAdapter.js';
+import { ModelOutputSchema, type ValidatedModelOutput } from './schema.js';
+import { advanceNarrativeState, createTurnDirective, type TurnDirective } from './directive.js';
+import { findFactualIssues } from './factualValidation.js';
+import { createNarrativeState } from '../../src/game/narrative.js';
 
 export interface CategorizedError {
   category: string;
