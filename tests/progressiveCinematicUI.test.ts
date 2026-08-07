@@ -312,7 +312,7 @@ const TUTORIAL_KEY_STRING = 'unsaid_tutorial_done';
 
 describe('20. tutorial can be skipped', () => {
   it('skip button exists in tutorial overlay', () => {
-    expect(COMPONENT).toContain('Skip tutorial');
+    expect(COMPONENT.toLowerCase()).toContain('skip tutorial');
   });
 
   it('handleTutorialSkip closes tutorial and marks done', () => {
@@ -690,5 +690,104 @@ describe('38. no API request from presentation transitions', () => {
     });
     expect(typeof result.closingFallback).toBe('string');
     expect(result.closingFallback.length).toBeGreaterThan(0);
+  });
+});
+
+describe('4-step manual tutorial and centered prologue layout', () => {
+  it('tutorial no longer has auto-advance timer effect', () => {
+    const tutStart = COMPONENT.indexOf('function TutorialOverlay');
+    const componentBeforeTut = COMPONENT.slice(0, tutStart);
+    expect(componentBeforeTut).not.toContain('setTutorialStep((s) => (s + 1)');
+  });
+
+  it('backdrop click does not skip or dismiss tutorial', () => {
+    const backdropIdx = COMPONENT.indexOf('className="cs-tutorial-backdrop"');
+    const backdropTag = COMPONENT.slice(backdropIdx, backdropIdx + 80);
+    expect(backdropTag).not.toContain('onClick');
+  });
+
+  it('explicit Next, Back, Got it, and Skip Tutorial handlers exist', () => {
+    expect(COMPONENT).toContain('handleTutorialNext');
+    expect(COMPONENT).toContain('handleTutorialBack');
+    expect(COMPONENT).toContain('handleTutorialGotIt');
+    expect(COMPONENT).toContain('handleTutorialSkip');
+  });
+
+  it('tutorial shows four steps with step tags and 4 of 4 progress text', () => {
+    expect(COMPONENT).toContain('step === 0');
+    expect(COMPONENT).toContain('step === 1');
+    expect(COMPONENT).toContain('step === 2');
+    expect(COMPONENT).toContain('step === 3');
+    expect(COMPONENT).toContain('{step + 1} of 4');
+  });
+
+  it('Got it and Skip Tutorial persist completion', () => {
+    const gotItStart = COMPONENT.indexOf('function handleTutorialGotIt');
+    const gotItEnd = COMPONENT.indexOf('\n  }', gotItStart) + 4;
+    const gotItBody = COMPONENT.slice(gotItStart, gotItEnd);
+    expect(gotItBody).toContain('writeTutorialDone(true)');
+    expect(gotItBody).toContain('setTutorialDone(true)');
+
+    const skipStart = COMPONENT.indexOf('function handleTutorialSkip');
+    const skipEnd = COMPONENT.indexOf('\n  }', skipStart) + 4;
+    const skipBody = COMPONENT.slice(skipStart, skipEnd);
+    expect(skipBody).toContain('writeTutorialDone(true)');
+    expect(skipBody).toContain('setTutorialDone(true)');
+  });
+
+  it('accidental backdrop interaction does not persist completion', () => {
+    const tutStart = COMPONENT.indexOf('function TutorialOverlay');
+    const tutEnd = COMPONENT.indexOf('\nfunction', tutStart + 1);
+    const tutBody = COMPONENT.slice(tutStart, tutEnd);
+    expect(tutBody).not.toContain('writeTutorialDone');
+  });
+
+  it('Escape key closes tutorial overlay without marking permanently complete', () => {
+    const escIdx = COMPONENT.indexOf('if (tutorialOpen)');
+    expect(escIdx).not.toBe(-1);
+    const escLine = COMPONENT.slice(escIdx, escIdx + 60);
+    expect(escLine).toContain('setTutorialOpen(false)');
+    expect(escLine).not.toContain('writeTutorialDone');
+  });
+
+  it('Replay Tutorial is present in PauseOverlay menu', () => {
+    const pauseStart = COMPONENT.indexOf('function PauseOverlay');
+    const pauseEnd = COMPONENT.indexOf('\nfunction', pauseStart + 1);
+    const pauseBody = COMPONENT.slice(pauseStart, pauseEnd);
+    expect(pauseBody).toContain('Replay Tutorial');
+    expect(pauseBody).toContain('onReopenTutorial');
+  });
+
+  it('replaying tutorial from pause does not reset game state', () => {
+    const reopenStart = COMPONENT.indexOf('function handleReopenTutorial');
+    const reopenEnd = COMPONENT.indexOf('\n  }', reopenStart) + 4;
+    const reopenBody = COMPONENT.slice(reopenStart, reopenEnd);
+    expect(reopenBody).toContain('setTutorialStep(0)');
+    expect(reopenBody).toContain('setTutorialOpen(true)');
+    expect(reopenBody).not.toContain('storeRestart');
+    expect(reopenBody).not.toContain('applyTurn');
+  });
+
+  it('prologue actions are centered via margin-inline: auto and stretch width', () => {
+    expect(CSS).toContain('.cs-prologue-actions');
+    expect(CSS).toContain('margin-inline: auto');
+    expect(CSS).toContain('width: min(100%, 280px)');
+  });
+
+  it('prologue DOM order has Continue/Enter the Café first, Skip second, Back third', () => {
+    const proStart = COMPONENT.indexOf('<div className="cs-prologue-actions">');
+    const proEnd = COMPONENT.indexOf('</div>\n        </div>', proStart + 1);
+    const proBody = COMPONENT.slice(proStart, proEnd);
+    const enterCafeIdx = proBody.indexOf('Enter the Café');
+    const continueIdx = proBody.indexOf('Continue');
+    const primaryIdx = enterCafeIdx !== -1 ? enterCafeIdx : continueIdx;
+    const skipIdx = proBody.indexOf('Skip Prologue');
+    const backIdx = proBody.indexOf('Back');
+    expect(primaryIdx).toBeLessThan(skipIdx);
+    expect(skipIdx).toBeLessThan(backIdx);
+  });
+
+  it('reduced-motion support includes cs-tutorial-card', () => {
+    expect(CSS).toContain('.cs-tutorial-card');
   });
 });

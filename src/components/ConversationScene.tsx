@@ -45,7 +45,7 @@ type InteractionStage =
   | 'waiting'
   | 'impact';
 
-type TUTORIAL_STEP = 0 | 1 | 2;
+type TUTORIAL_STEP = 0 | 1 | 2 | 3;
 
 interface IntentionDef {
   id: PlayerIntent;
@@ -219,16 +219,25 @@ export default function ConversationScene() {
     writeTutorialDone(true);
     setTutorialDone(true);
   }
+  function handleTutorialGotIt() {
+    setTutorialOpen(false);
+    writeTutorialDone(true);
+    setTutorialDone(true);
+  }
   function handleReopenTutorial() {
+    storeResume();
     setTutorialStep(0);
     setTutorialOpen(true);
   }
   function handleTutorialNext() {
-    if (tutorialStep >= 2) {
-      handleTutorialSkip();
-      return;
+    if (tutorialStep < 3) {
+      setTutorialStep((tutorialStep + 1) as TUTORIAL_STEP);
     }
-    setTutorialStep((tutorialStep + 1) as TUTORIAL_STEP);
+  }
+  function handleTutorialBack() {
+    if (tutorialStep > 0) {
+      setTutorialStep((tutorialStep - 1) as TUTORIAL_STEP);
+    }
   }
   function onConfirmRestart() {
     handleRestart();
@@ -308,13 +317,6 @@ export default function ConversationScene() {
   }, [stage]);
 
   useEffect(() => {
-    if (tutorialOpen && tutorialStep < 2) {
-      const t = setTimeout(() => setTutorialStep((s) => (s + 1) as TUTORIAL_STEP), 1200);
-      return () => clearTimeout(t);
-    }
-  }, [tutorialOpen, tutorialStep]);
-
-  useEffect(() => {
     if (!tutorialDone && mode === 'playing') {
       const t = setTimeout(() => setTutorialOpen(true), 600);
       return () => clearTimeout(t);
@@ -354,7 +356,7 @@ export default function ConversationScene() {
     return () => window.removeEventListener('keydown', onKey);
   }, [mode, prologuePart, nextProloguePart, prevProloguePart, returnToTitle]);
 
-  // Global keyboard (Escape for pause)
+  // Global keyboard (Escape for pause / close tutorial)
   useEffect(() => {
     function onKey(e: globalThis.KeyboardEvent) {
       if (e.key !== 'Escape') return;
@@ -362,12 +364,13 @@ export default function ConversationScene() {
       if (showHowToPlay)      { setShowHowToPlay(false);      return; }
       if (showRestartConfirm) { setShowRestartConfirm(false); return; }
       if (showTitleConfirm)   { setShowTitleConfirm(false);   return; }
+      if (tutorialOpen)       { setTutorialOpen(false);       return; }
       if (mode === 'paused')  { storeResume();                return; }
       if (mode === 'playing') { storePause();                  return; }
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [mode, showCredits, showHowToPlay, showRestartConfirm, showTitleConfirm, storePause, storeResume]);
+  }, [mode, showCredits, showHowToPlay, showRestartConfirm, showTitleConfirm, tutorialOpen, storePause, storeResume]);
 
   // ─── TITLE SCREEN ─────────────────────────────────────
   if (mode === 'title') {
@@ -842,6 +845,8 @@ export default function ConversationScene() {
         <TutorialOverlay
           step={tutorialStep}
           onNext={handleTutorialNext}
+          onBack={handleTutorialBack}
+          onGotIt={handleTutorialGotIt}
           onSkip={handleTutorialSkip}
         />
       )}
@@ -977,6 +982,7 @@ function PauseOverlay({
   onConfirmTitle,
   onCancelTitle,
   onHowToPlay,
+  onReopenTutorial,
 }: PauseOverlayProps) {
   const resumeBtnRef = useRef<HTMLButtonElement>(null);
   const prevFocusRef = useRef<HTMLElement | null>(null);
@@ -1012,6 +1018,9 @@ function PauseOverlay({
             <div className="cs-pause-separator" aria-hidden="true" />
             <button className="cs-pause-btn cs-pause-btn--ghost" onClick={onHowToPlay}>
               How to Play
+            </button>
+            <button className="cs-pause-btn cs-pause-btn--ghost" onClick={onReopenTutorial}>
+              Replay Tutorial
             </button>
             <div className="cs-pause-separator" aria-hidden="true" />
             <button className="cs-pause-btn cs-pause-btn--danger" onClick={onRequestRestart}>
@@ -1085,50 +1094,160 @@ function ConfirmPanel({
 // ═══════════════════════════════════════════════════════
 // TUTORIAL OVERLAY
 // ═══════════════════════════════════════════════════════
-const TUTORIAL_STEPS = [
-  {
-    title: 'Step 1 — Intention',
-    text: 'First, choose what you are trying to accomplish.',
-  },
-  {
-    title: 'Step 2 — Wording',
-    text: 'Then write what you would genuinely say. Your exact words matter.',
-  },
-  {
-    title: 'Step 3 — Impact',
-    text: 'What you intend and what the other person hears may be different.',
-  },
-] as const;
-
 interface TutorialOverlayProps {
-  step:   0 | 1 | 2;
+  step: 0 | 1 | 2 | 3;
   onNext: () => void;
+  onBack: () => void;
+  onGotIt: () => void;
   onSkip: () => void;
 }
 
-function TutorialOverlay({ step, onNext, onSkip }: TutorialOverlayProps) {
-  const current = TUTORIAL_STEPS[step];
-  const isLast  = step >= 2;
+function TutorialOverlay({ step, onNext, onBack, onGotIt, onSkip }: TutorialOverlayProps) {
+  const primaryBtnRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    primaryBtnRef.current?.focus();
+  }, [step]);
 
   return (
     <div
       className="cs-tutorial-overlay"
       role="dialog"
       aria-modal="true"
-      aria-label="Tutorial"
+      aria-labelledby="tutorial-title"
     >
-      <div className="cs-tutorial-spotlight" aria-hidden="true" onClick={onSkip} />
-      <div className="cs-tutorial-tooltip">
-        <p className="cs-tutorial-step">{current.title}</p>
-        <p className="cs-tutorial-text">{current.text}</p>
-        <div className="cs-tutorial-actions">
-          <button className="cs-tutorial-skip-btn" onClick={onSkip}>
-            Skip tutorial
-          </button>
-          <button className="cs-tutorial-next-btn" onClick={onNext} autoFocus>
-            {isLast ? 'Done' : 'Next'}
-          </button>
+      <div className="cs-tutorial-backdrop" aria-hidden="true" />
+      <div className="cs-tutorial-card">
+        <div className="cs-tutorial-header">
+          <span className="cs-tutorial-step-tag">First-Play Guide</span>
+          <span className="cs-tutorial-progress-text">{step + 1} of 4</span>
         </div>
+
+        {step === 0 && (
+          <>
+            <h2 id="tutorial-title" className="cs-tutorial-title">Choose your intention</h2>
+            <div className="cs-tutorial-body">
+              <p>Before each message, choose what you are genuinely trying to do.</p>
+              <div className="cs-tutorial-grid">
+                <div className="cs-tutorial-item">
+                  <div className="cs-tutorial-item-label">Understand</div>
+                  <div className="cs-tutorial-item-desc">Ask and listen</div>
+                </div>
+                <div className="cs-tutorial-item">
+                  <div className="cs-tutorial-item-label">Acknowledge</div>
+                  <div className="cs-tutorial-item-desc">Own the harm</div>
+                </div>
+                <div className="cs-tutorial-item">
+                  <div className="cs-tutorial-item-label">Explain</div>
+                  <div className="cs-tutorial-item-desc">Give honest context</div>
+                </div>
+                <div className="cs-tutorial-item">
+                  <div className="cs-tutorial-item-label">Repair</div>
+                  <div className="cs-tutorial-item-desc">Offer a next step</div>
+                </div>
+              </div>
+              <p className="cs-tutorial-emphasis">Your intention is what you mean to do.</p>
+            </div>
+          </>
+        )}
+
+        {step === 1 && (
+          <>
+            <h2 id="tutorial-title" className="cs-tutorial-title">Say it in your own words</h2>
+            <div className="cs-tutorial-body">
+              <p>After choosing an intention, write what you would actually say.</p>
+              <p>Your exact wording matters. Gemini responds to the words you type — not just the intention you selected.</p>
+              <p className="cs-tutorial-emphasis">There are no scripted dialogue choices.</p>
+            </div>
+          </>
+        )}
+
+        {step === 2 && (
+          <>
+            <h2 id="tutorial-title" className="cs-tutorial-title">Intent is not always impact</h2>
+            <div className="cs-tutorial-body">
+              <p>After each response, UNSAID shows how your words landed.</p>
+              <div className="cs-tutorial-list">
+                <div className="cs-tutorial-item">
+                  <div className="cs-tutorial-item-label">Aligned</div>
+                  <div className="cs-tutorial-item-desc">Your wording carried your intention.</div>
+                </div>
+                <div className="cs-tutorial-item">
+                  <div className="cs-tutorial-item-label">Constructive divergence</div>
+                  <div className="cs-tutorial-item-desc">It landed differently, but still helped.</div>
+                </div>
+                <div className="cs-tutorial-item">
+                  <div className="cs-tutorial-item-label">Harmful divergence</div>
+                  <div className="cs-tutorial-item-desc">The wording created pressure or distance.</div>
+                </div>
+              </div>
+              <div className="cs-tutorial-grid" style={{ marginTop: '10px' }}>
+                <div className="cs-tutorial-item">
+                  <div className="cs-tutorial-item-label">Connection</div>
+                  <div className="cs-tutorial-item-desc">How willing she is to stay connected.</div>
+                </div>
+                <div className="cs-tutorial-item">
+                  <div className="cs-tutorial-item-label">Pressure</div>
+                  <div className="cs-tutorial-item-desc">How tense the conversation has become.</div>
+                </div>
+              </div>
+              <p className="cs-tutorial-emphasis">Meaning well does not guarantee landing well.</p>
+            </div>
+          </>
+        )}
+
+        {step === 3 && (
+          <>
+            <h2 id="tutorial-title" className="cs-tutorial-title">You still have to read the room</h2>
+            <div className="cs-tutorial-body">
+              <p>Read the room gives one short observation about the current emotional situation.</p>
+              <div className="cs-tutorial-list">
+                <div className="cs-tutorial-item">
+                  <div className="cs-tutorial-item-label">It is optional and local:</div>
+                  <div className="cs-tutorial-item-desc">• No API request &nbsp;• No turn consumed<br />• No score change &nbsp;• Never writes your answer</div>
+                </div>
+              </div>
+              <p>Conversation Log lets you review what both of you have said.</p>
+              <p className="cs-tutorial-emphasis">There are 10 turns. What you say shapes what becomes possible.</p>
+            </div>
+          </>
+        )}
+
+        <div className="cs-tutorial-nav">
+          {step > 0 ? (
+            <button className="cs-tutorial-btn-ghost" onClick={onBack}>
+              Back
+            </button>
+          ) : (
+            <div style={{ width: '60px' }} aria-hidden="true" />
+          )}
+
+          <span className="cs-tutorial-progress-text" aria-live="polite">
+            {step + 1} of 4
+          </span>
+
+          {step < 3 ? (
+            <button
+              ref={primaryBtnRef}
+              className="cs-tutorial-btn-primary"
+              onClick={onNext}
+            >
+              Next
+            </button>
+          ) : (
+            <button
+              ref={primaryBtnRef}
+              className="cs-tutorial-btn-primary"
+              onClick={onGotIt}
+            >
+              Got it
+            </button>
+          )}
+        </div>
+
+        <button className="cs-tutorial-skip-btn" onClick={onSkip}>
+          Skip Tutorial
+        </button>
       </div>
     </div>
   );
