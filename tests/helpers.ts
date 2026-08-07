@@ -90,3 +90,47 @@ export function makeAssessment(
     tensionDelta: 0,
   };
 }
+
+export function detectSuspiciousEcho(playerText: string, characterText: string): boolean {
+  if (playerText.trim().split(/\s+/).length < 5) return false;
+
+  const normalize = (text: string) => text.toLowerCase()
+    .replace(/[.,!?]/g, '')
+    .replace(/\b(i|me)\b/g, 'you')
+    .replace(/\bmy\b/g, 'your')
+    .replace(/\bam\b/g, 'are')
+    .trim();
+
+  if (characterText.trim().split(/\s+/).length <= 3 && characterText.includes('?')) return false;
+
+  const playerWords = normalize(playerText).split(/\s+/);
+  const characterWords = normalize(characterText).split(/\s+/);
+
+  const stopWords = new Set(['you', 'it', 'the', 'and', 'to', 'a', 'of', 'in', 'that', 'is', 'was', 'your', 'but', 'not', 'we', 'are', 'what', 'do', 'don\'t', 'did', 'didn\'t', 'know', 'think', 'for']);
+  const contextNouns = new Set(['exhibition', 'cafe', 'photographs']);
+
+  let maxConsecutiveMatch = 0;
+  for (let i = 0; i <= playerWords.length - 5; i++) {
+    for (let j = 0; j <= characterWords.length - 5; j++) {
+      let matchCount = 0;
+      let meaningfulCount = 0;
+      while (
+        i + matchCount < playerWords.length &&
+        j + matchCount < characterWords.length &&
+        playerWords[i + matchCount] === characterWords[j + matchCount]
+      ) {
+        const word = playerWords[i + matchCount];
+        if (!stopWords.has(word) && !contextNouns.has(word)) {
+          meaningfulCount++;
+        }
+        matchCount++;
+      }
+
+      if (matchCount >= 5 && meaningfulCount >= 1) {
+        maxConsecutiveMatch = Math.max(maxConsecutiveMatch, matchCount);
+      }
+    }
+  }
+
+  return maxConsecutiveMatch >= 5;
+}
