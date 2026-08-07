@@ -1,7 +1,7 @@
 import { Router } from 'express';
-import { TurnRequestSchema } from './validation';
-import { processTurnDetailed, RecoverableTurnError } from './service';
-import { ModelAdapter } from '../adapters/ModelAdapter';
+import { TurnRequestSchema } from './validation.ts';
+import { processTurnDetailed, RecoverableTurnError } from './service.ts';
+import { ModelAdapter } from '../adapters/ModelAdapter.ts';
 
 export function createTurnRouter(
   adapter: ModelAdapter,

@@ -1,8 +1,8 @@
-import type { ModelAdapter } from './ModelAdapter';
-import type { ModelOutput, TurnRequest } from '../../src/game/types';
-import { SCENARIO } from '../../src/game/scenario';
-import { createTurnDirective } from '../turn/directive';
-import { isPlayerCenteredGuilt, isReassurancePressure } from '../../src/game/narrative';
+import type { ModelAdapter } from './ModelAdapter.ts';
+import type { ModelOutput, TurnRequest } from '../../src/game/types.ts';
+import { SCENARIO } from '../../src/game/scenario.ts';
+import { createTurnDirective } from '../turn/directive.ts';
+import { isPlayerCenteredGuilt, isReassurancePressure } from '../../src/game/narrative.ts';
 
 export type MockMode = 'valid' | 'malformed' | 'error';
 

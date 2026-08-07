@@ -1,7 +1,7 @@
-import type { TurnRequest } from '../../src/game/types';
-import type { ModelAdapter } from './ModelAdapter';
-import { buildLivePrompt } from '../turn/prompt';
-import { SCENARIO } from '../../src/game/scenario';
+import type { TurnRequest } from '../../src/game/types.ts';
+import type { ModelAdapter } from './ModelAdapter.ts';
+import { buildLivePrompt } from '../turn/prompt.ts';
+import { SCENARIO } from '../../src/game/scenario.ts';
 
 const IMPACT_VALUES = [
   'understanding',

@@ -1,4 +1,4 @@
-import type { TurnRequest } from '../../src/game/types';
+import type { TurnRequest } from '../../src/game/types.ts';
 import {
   CHARACTER_MEMORIES,
   createNarrativeState,
@@ -11,7 +11,7 @@ import {
   type GenuineQuestionClassification,
   type NarrativeState,
   type SceneMove,
-} from '../../src/game/narrative';
+} from '../../src/game/narrative.ts';
 
 export type TurnTone = 'guarded' | 'hurt' | 'sharp' | 'softer' | 'tired' | 'uncertain';
 export type TargetLength = 'very_short' | 'short' | 'medium' | 'long';

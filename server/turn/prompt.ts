@@ -1,7 +1,7 @@
-import type { TurnRequest } from '../../src/game/types';
-import { CHARACTER_PROFILE } from '../../src/game/narrative';
-import { SCENARIO } from '../../src/game/scenario';
-import { createTurnDirective } from './directive';
+import type { TurnRequest } from '../../src/game/types.ts';
+import { CHARACTER_PROFILE } from '../../src/game/narrative.ts';
+import { SCENARIO } from '../../src/game/scenario.ts';
+import { createTurnDirective } from './directive.ts';
 
 export interface LivePrompt { system: string; user: string; }
 
