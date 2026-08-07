@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { SCENARIO } from '../../src/game/scenario';
-import { PlayerIntentSchema } from './schema';
+import { SCENARIO } from '../../src/game/scenario.js';
+import { PlayerIntentSchema } from './schema.js';
 
 export const TranscriptEntrySchema = z.object({
   speaker: z.enum(['player', 'character']),
