@@ -1,4 +1,4 @@
-import { TurnRequest, TurnResponse } from '../game/types';
+import { TurnRequest, TurnResponse } from '../game/types.js';
 
 export class TurnClientError extends Error {
   constructor(

@@ -3,7 +3,7 @@ import type {
   FinalClosures,
   OutcomeDef,
   StateBounds,
-} from './types';
+} from './types.js';
 
 export const SCENARIO = {
   id: 'say-it-again',

@@ -1,5 +1,5 @@
-import type { PortraitState, GameState } from './types';
-import { SCENARIO } from './scenario';
+import type { PortraitState, GameState } from './types.js';
+import { SCENARIO } from './scenario.js';
 
 export function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));

@@ -5,10 +5,10 @@ import type {
   PerceivedImpact,
   PlayerIntent,
   TurnAssessment,
-} from './types';
-import type { NarrativeState } from './narrative';
-import { isFriendComfortingPlayer } from './narrative';
-import { SCENARIO } from './scenario';
+} from './types.js';
+import type { NarrativeState } from './narrative.js';
+import { isFriendComfortingPlayer } from './narrative.js';
+import { SCENARIO } from './scenario.js';
 
 const DIRECT_IMPACT: Record<PlayerIntent, PerceivedImpact> = {
   understand: 'understanding',

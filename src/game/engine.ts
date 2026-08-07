@@ -1,4 +1,4 @@
-import { SCENARIO } from './scenario';
+import { SCENARIO } from './scenario.js';
 
 export function canSubmitTurn(
   turnIndex: number,

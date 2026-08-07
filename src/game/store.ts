@@ -8,12 +8,12 @@ import type {
   TurnAssessment,
   TurnRequest,
   TurnNarrativeMeta,
-} from './types';
-import { createNarrativeState, type NarrativeState } from './narrative';
-import { SCENARIO } from './scenario';
-import { applyTurn, derivePortraitState } from './state';
-import { classifyAlignment, evaluateOutcome, selectOutcomeClosure } from './outcome';
-import { postTurn } from '../lib/turnClient';
+} from './types.js';
+import { createNarrativeState, type NarrativeState } from './narrative.js';
+import { SCENARIO } from './scenario.js';
+import { applyTurn, derivePortraitState } from './state.js';
+import { classifyAlignment, evaluateOutcome, selectOutcomeClosure } from './outcome.js';
+import { postTurn } from '../lib/turnClient.js';
 
 type Status = 'idle' | 'loading' | 'error';
 
