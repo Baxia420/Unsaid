@@ -6,6 +6,7 @@ import { processTurn } from '../server/turn/service';
 import { applyTurn, derivePortraitState } from '../src/game/state';
 import { classifyAlignment, evaluateOutcome } from '../src/game/outcome';
 import { SCENARIO } from '../src/game/scenario';
+import { createNarrativeState } from '../src/game/narrative';
 import type {
   PlayerIntent,
   TranscriptEntry,
@@ -25,6 +26,8 @@ async function completeRun(adapter: ModelAdapter) {
     { speaker: 'character', text: SCENARIO.openingLine },
   ];
   const assessments: TurnAssessment[] = [];
+  let narrativeState = createNarrativeState();
+  const narrativeHistory = [];
   let finalClosures = undefined;
 
   for (let turnIndex = 0; turnIndex < SCENARIO.totalTurns; turnIndex += 1) {
@@ -37,6 +40,7 @@ async function completeRun(adapter: ModelAdapter) {
         selectedIntention: route.intention,
         state: emotionalState,
         recentTranscript: transcript,
+        narrativeState,
       },
       adapter
     );
@@ -69,6 +73,9 @@ async function completeRun(adapter: ModelAdapter) {
       { speaker: 'character', text: response.characterText },
     ];
     finalClosures = response.finalClosures;
+    if (!response.narrative) throw new Error('missing narrative');
+    narrativeState = response.narrative.state;
+    narrativeHistory.push(response.narrative.meta);
   }
 
   return {
@@ -76,10 +83,12 @@ async function completeRun(adapter: ModelAdapter) {
     emotionalState,
     transcript,
     finalClosures,
+    narrativeHistory,
     outcome: evaluateOutcome({
       assessments,
       finalEngagement: emotionalState.engagement,
       finalTension: emotionalState.tension,
+      narrativeState,
     }),
   };
 }
@@ -93,6 +102,7 @@ describe('complete deterministic runs', () => {
     expect(result.transcript.filter((entry) => entry.speaker === 'player')).toHaveLength(10);
     expect(result.transcript.filter((entry) => entry.speaker === 'character')).toHaveLength(11);
     expect(result.assessments).toHaveLength(10);
+    expect(result.narrativeHistory).toHaveLength(10);
     expect(result.finalClosures).toBeDefined();
     expect(['even', 'smoothed', 'the_speech']).toContain(result.outcome);
   });

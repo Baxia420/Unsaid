@@ -49,7 +49,27 @@ Copy `.env.example` to `.env` and set variables as needed. `.env` is ignored by 
 
 **Optional recorded recovery** (`UNSAID_AI_MODE=live`, `UNSAID_LIVE_RECOVERY=recorded`) uses Gemini as the primary adapter. On a single provider failure, it attempts one bounded recovery via `RecordedModelAdapter`. Recovery is explicitly logged and identified in response headers (`X-Unsaid-Recovery-Used`).
 
-If `UNSAID_AI_MODE=live` is set but `GEMINI_API_KEY` is missing or blank, the server emits one warning and runs in recorded mode. No live-AI claim should be made while recorded mode is active; `/api/status` reports the active and recovery modes.
+If `UNSAID_AI_MODE=live` is set but `GEMINI_API_KEY` is missing or blank, the server fails closed. It does not substitute mock or recorded dialogue; the player receives a retryable error and the turn is not consumed.
+
+## Deploy to Vercel
+
+The Vite frontend builds to `dist/`. The existing Express app is exported through thin Vercel Function entries under `api/`, so `/api/turn` and `/api/status` stay same-origin without depending on `server.listen()` in production. `vercel.json` keeps browser routes on the SPA while excluding `/api`.
+
+1. Import the GitHub repository into Vercel.
+2. Configure these server-side environment variables in Vercel project settings:
+
+   ```text
+   UNSAID_AI_MODE=live
+   UNSAID_LIVE_RECOVERY=none
+   GEMINI_MODEL=gemini-3.5-flash-lite
+   GEMINI_API_KEY=<configured only in Vercel environment settings>
+   ```
+
+3. Build and deploy from Vercel.
+4. Redeploy after changing environment variables.
+5. Smoke-test the actual production URL, including a real `/api/turn` retry path.
+
+Never place the API key in repository files or client-side variables. The previously exposed Gemini credential must be rotated before any public production deployment.
 
 ### Diagnostic Script
 
@@ -225,7 +245,7 @@ These deltas are clamped to `[-3, 3]` per turn and accumulated state is clamped 
 - The client currently sends the **accumulated transcript** as `recentTranscript`; the current slice is designed and verified for a short placeholder conversation.
 - `portraitState` is temporarily visible in the interface for debugging purposes.
 - **Engagement and Tension remain hidden** from the interface; they are code-owned state axes only.
-- **Live fallback** — if the Gemini provider times out, returns a non-2xx response, produces invalid JSON, or returns schema-invalid output, the turn falls back to the deterministic scenario-owned fallback response automatically. The game remains playable.
+- **Strict live failure** — provider, schema, and factual-consistency failures return a retryable error without consuming a turn or substituting deterministic dialogue.
 
 ## License
 

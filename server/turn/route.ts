@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { TurnRequestSchema } from './validation';
-import { processTurnDetailed } from './service';
+import { processTurnDetailed, RecoverableTurnError } from './service';
 import { ModelAdapter } from '../adapters/ModelAdapter';
 
 export function createTurnRouter(
@@ -23,7 +23,20 @@ export function createTurnRouter(
       });
     }
 
-    const result = await processTurnDetailed(parsed.data, adapter, recoveryAdapter);
+    let result;
+    try {
+      result = await processTurnDetailed(parsed.data, adapter, recoveryAdapter);
+    } catch (error) {
+      if (error instanceof RecoverableTurnError) {
+        console.log(`[UNSAID] turn=${parsed.data.turnIndex + 1} source=provider status=rejected reason=${error.code} retryable=true`);
+        return res.status(422).json({
+          error: error.message,
+          code: error.code,
+          retryable: true,
+        });
+      }
+      throw error;
+    }
 
     const turn = parsed.data.turnIndex + 1;
     if (result.failureCategory) {

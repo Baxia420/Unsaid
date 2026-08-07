@@ -130,11 +130,11 @@ describe('failure, retry, and stale requests', () => {
     enterPlaying(); prepareSubmission(); postTurnMock.mockRejectedValueOnce(new Error('fail')); await state().submitTurn();
     expect(state().narrativeHistory).toHaveLength(0);
     const narrativeState = { ...createNarrativeState(), recentSceneMoves: ['answer' as const] };
-    postTurnMock.mockResolvedValueOnce(makeTurnResponse({ narrative: { state: narrativeState, meta: { sceneMove: 'answer', memoryId: null, activeBelief: narrativeState.activeBelief } } }));
+    postTurnMock.mockResolvedValueOnce(makeTurnResponse({ narrative: { state: narrativeState, meta: { turnIndex: 0, primarySceneMove: 'answer', targetLength: 'medium', offeredMemoryId: null, revealedMemoryId: null, activeBeliefBefore: 'i_did_not_matter', activeBeliefAfter: narrativeState.activeBelief, genuineQuestion: 'experience' } } }));
     await state().retryTurn(); expect(state().narrativeHistory).toHaveLength(1); expect(state().narrativeState.recentSceneMoves).toEqual(['answer']);
   });
   it('replay resets narrative state', () => {
-    useGameStore.setState({ narrativeState: { ...createNarrativeState(), revealedMemoryIds: ['empty_chair'] }, narrativeHistory: [{ sceneMove: 'reveal_memory', memoryId: 'empty_chair', activeBelief: 'i_did_not_matter' }] });
+    useGameStore.setState({ narrativeState: { ...createNarrativeState(), revealedMemoryIds: ['empty_chair'] }, narrativeHistory: [{ turnIndex: 0, primarySceneMove: 'reveal_memory', targetLength: 'long', offeredMemoryId: 'empty_chair', revealedMemoryId: 'empty_chair', activeBeliefBefore: 'i_did_not_matter', activeBeliefAfter: 'i_did_not_matter', genuineQuestion: 'none' }] });
     state().restart(); expect(state().narrativeState).toEqual(createNarrativeState()); expect(state().narrativeHistory).toEqual([]);
   });
   it('blocks simultaneous duplicate retry', async () => {
@@ -165,8 +165,10 @@ describe('turn-10 closing and outcome flow', () => {
   beforeEach(() => {
     enterPlaying();
     const assessments: TurnAssessment[] = Array.from({ length: 9 }, () => makeAssessment('repair', 'repair'));
-    useGameStore.setState({ turnIndex: 9, assessments, engagement: 8, tension: 0 });
-    postTurnMock.mockResolvedValue(makeTurnResponse({ finalClosures: CLOSURES, assessment: { perceivedImpact: 'repair', impactReason: 'It left room.', engagementDelta: 1, tensionDelta: -1 } }));
+    const narrativeState = { ...createNarrativeState(), revealedMemoryIds: ['missed_player'], activeBelief: 'repair_might_be_possible' as const };
+    useGameStore.setState({ turnIndex: 9, assessments, engagement: 8, tension: 0, narrativeState });
+    const baseResponse = makeTurnResponse();
+    postTurnMock.mockResolvedValue(makeTurnResponse({ finalClosures: CLOSURES, assessment: { perceivedImpact: 'repair', impactReason: 'It left room.', engagementDelta: 1, tensionDelta: -1 }, narrative: { state: narrativeState, meta: baseResponse.narrative!.meta } }));
     prepareSubmission('I will respect your boundary.', 'repair');
   });
   it('enters closing before outcome and selects code-owned matching closure', async () => {

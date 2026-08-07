@@ -8,11 +8,12 @@ import type {
   TurnResponse,
 } from '../src/game/types';
 import { SCENARIO } from '../src/game/scenario';
+import { createNarrativeState } from '../src/game/narrative';
 
 export const CLOSURES: FinalClosures = {
   even: 'We can speak again, but slowly.',
   smoothed: 'Let us leave it here today.',
-  the_speech: 'I need to go now.',
+  the_speech: "You're not a terrible person. I know you did not mean to hurt me.",
 };
 
 export function makeRequest(overrides: Partial<TurnRequest> = {}): TurnRequest {
@@ -43,6 +44,7 @@ export function makeModelOutput(
 export function makeTurnResponse(
   overrides: Partial<TurnResponse> = {}
 ): TurnResponse {
+  const narrativeState = createNarrativeState();
   return {
     characterText: 'I kept looking at the door.',
     assessment: {
@@ -52,6 +54,19 @@ export function makeTurnResponse(
       tensionDelta: -1,
     },
     presentation: { portraitState: 'distant' },
+    narrative: {
+      state: narrativeState,
+      meta: {
+        turnIndex: 0,
+        primarySceneMove: 'answer',
+        targetLength: 'medium',
+        offeredMemoryId: null,
+        revealedMemoryId: null,
+        activeBeliefBefore: 'i_did_not_matter',
+        activeBeliefAfter: 'i_did_not_matter',
+        genuineQuestion: 'experience',
+      },
+    },
     ...overrides,
   };
 }

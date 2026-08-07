@@ -27,6 +27,7 @@ import {
   PORTRAIT_DATA_STATE,
   computeOutcomeSummary,
   getConnectionLabel,
+  getOutcomePortrait,
   getPressureLabel,
   getReflection,
   getReviewSummary,
@@ -480,11 +481,12 @@ export default function ConversationScene() {
   // ─── OUTCOME SCREEN ───────────────────────────────────
   if (mode === 'outcome') {
     const out = outcome ?? SCENARIO.outcomes['even'];
-    const reflection = getReflection(assessments, engagement, tension);
+    const reflection = getReflection(assessments, engagement, tension, out.id);
     const review = getReviewSummary(assessments);
     const connLabel = getConnectionLabel(engagement);
     const presLabel = getPressureLabel(tension);
     const summary = computeOutcomeSummary(assessments);
+    const outcomePortrait = getOutcomePortrait(out.id, portrait as PortraitState);
     return (
       <div className="cs-root cs-outcome-mode" data-app-mode="outcome">
         <div
@@ -497,7 +499,7 @@ export default function ConversationScene() {
           {!portraitFailed && (
             <img
               className="cs-outcome-portrait"
-              src={PORTRAIT_OPEN[portrait as PortraitState]}
+              src={PORTRAIT_OPEN[outcomePortrait]}
               alt="Friend portrait"
               onLoad={() => setFailedPortrait(false)}
               onError={() => setFailedPortrait(true)}
@@ -903,7 +905,7 @@ function ConversationLog({ transcript, assessments, narrativeHistory, onClose }:
           {transcript.map((entry, index) => <article className="cs-log-entry" key={`${entry.speaker}-${index}`}><span>{entry.speaker === 'character' ? 'Friend' : 'You'}</span><p>{entry.text}</p></article>)}
         </div>
         <button className="cs-outcome-review-toggle" onClick={() => setShowDetails((value) => !value)} aria-expanded={showDetails}>Turn details</button>
-        {showDetails && <div className="cs-log-details">{assessments.map((assessment, index) => { const narrative = narrativeHistory[index]; return <p key={index}>Turn {index + 1}: {humanizeLabel(assessment.selectedIntent)} → {humanizeLabel(assessment.perceivedImpact)} ({humanizeLabel(assessment.alignment)}){narrative ? ` · ${humanizeLabel(narrative.sceneMove)} · ${narrative.providerSource ?? 'local'} ${narrative.latencyMs ?? 0}ms` : ''}</p>; })}</div>}
+        {showDetails && <div className="cs-log-details">{assessments.map((assessment, index) => { const narrative = narrativeHistory[index]; return <p key={index}>Turn {index + 1}: {humanizeLabel(assessment.selectedIntent)} → {humanizeLabel(assessment.perceivedImpact)} ({humanizeLabel(assessment.alignment)}){narrative ? ` · ${humanizeLabel(narrative.primarySceneMove)} · ${narrative.providerSource ?? 'local'} ${narrative.latencyMs ?? 0}ms` : ''}</p>; })}</div>}
         <footer className="cs-log-actions"><button className="cs-outcome-btn cs-outcome-btn--primary" onClick={() => void copy(readable, 'Transcript')}>Copy Transcript</button><button className="cs-outcome-btn" onClick={() => void copy(debug, 'Debug data')}>Copy Debug Data</button><span role="status" aria-live="polite">{copyStatus}</span></footer>
       </section>
     </div>

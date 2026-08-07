@@ -59,6 +59,19 @@ describe('turn route validation', () => {
     expect(response.status).toBe(503);
     expect(response.body.error).toBe('The conversation service is temporarily unavailable. Please retry.');
   });
+  it('returns a typed recoverable error for factual rejection without consuming a turn', async () => {
+    const invalidFact: ModelAdapter = {
+      generateTurn: vi.fn(async () => makeModelOutput({ characterText: 'We spent two hours choosing the chair.' })),
+    };
+    const response = await request(app(invalidFact, undefined, true)).post('/api/turn').send(makeRequest());
+    expect(response.status).toBe(422);
+    expect(response.body).toMatchObject({
+      code: 'FACTUAL_CONSISTENCY_REJECTED',
+      retryable: true,
+    });
+    expect(response.body).not.toHaveProperty('narrative');
+    expect(invalidFact.generateTurn).toHaveBeenCalledOnce();
+  });
   it('sets source headers without credentials', async () => {
     const response = await request(app(validAdapter)).post('/api/turn').send(makeRequest());
     expect(response.status).toBe(200);

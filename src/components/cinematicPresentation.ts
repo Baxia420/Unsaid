@@ -12,6 +12,7 @@ import type {
   PlayerIntent,
   PortraitState,
   TurnAssessment,
+  OutcomeId,
 } from '../game/types';
 import { SCENARIO } from '../game/scenario';
 
@@ -101,6 +102,12 @@ export function getPressureLabel(tension: number): string {
   if (tension <= -1) return 'Uneasy';
   if (tension <= 4) return 'Strained';
   return 'Overwhelming';
+}
+
+export function getOutcomePortrait(outcomeId: OutcomeId, current: PortraitState): PortraitState {
+  if (outcomeId === 'even') return 'connected';
+  if (outcomeId === 'the_speech') return 'hurt_exposed';
+  return current === 'connected' ? 'hurt_exposed' : current;
 }
 
 // ── Read the Room hint generation (presentation only) ──────────────────────────
@@ -212,9 +219,24 @@ export function getReviewSummary(assessments: TurnAssessment[]): ReviewSummary {
   return { mostUsedIntention, mostCommonImpact, alignedMoments, constructiveDivergences, harmfulDivergences };
 }
 
-export function getReflection(assessments: TurnAssessment[], finalEngagement: number, finalTension: number): string {
+export function getReflection(
+  assessments: TurnAssessment[],
+  finalEngagement: number,
+  finalTension: number,
+  outcomeId?: OutcomeId
+): string {
   if (!assessments || assessments.length === 0) {
     return 'The conversation ended before it could begin.';
+  }
+
+  if (outcomeId === 'even') {
+    return 'Something honest opened between you. Trust is not rebuilt and forgiveness is not promised, but the conversation reached something real.';
+  }
+  if (outcomeId === 'smoothed') {
+    return 'The conversation ended without genuine repair. Courtesy, distance, or a final boundary left the hurt unresolved.';
+  }
+  if (outcomeId === 'the_speech') {
+    return 'She reassured you, but your need for relief displaced the hurt she came to name.';
   }
 
   const summary = getReviewSummary(assessments);

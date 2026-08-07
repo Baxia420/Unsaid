@@ -12,9 +12,13 @@ export function createModelAdapter(): ModelAdapter {
     const key = process.env.GEMINI_API_KEY;
     if (!key || key.trim() === '') {
       console.warn(
-        '[UNSAID] live mode selected but GEMINI_API_KEY is missing or blank. Falling back to recorded adapter.'
+        '[UNSAID] live mode selected but GEMINI_API_KEY is missing or blank. Live requests will fail closed.'
       );
-      return new RecordedModelAdapter();
+      return {
+        async generateTurn(): Promise<never> {
+          throw new Error('Live AI is not configured.');
+        },
+      };
     }
     return new GeminiModelAdapter();
   }
@@ -35,7 +39,6 @@ export function getLiveRecovery(): 'none' | 'recorded' {
 
 export function getRuntimeMode(): 'live' | 'recorded' | 'mock' {
   if (process.env.UNSAID_AI_MODE === 'recorded') return 'recorded';
-  if (process.env.UNSAID_AI_MODE === 'live' && process.env.GEMINI_API_KEY?.trim()) return 'live';
-  if (process.env.UNSAID_AI_MODE === 'live') return 'recorded';
+  if (process.env.UNSAID_AI_MODE === 'live') return 'live';
   return 'mock';
 }

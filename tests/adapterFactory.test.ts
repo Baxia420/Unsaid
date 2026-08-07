@@ -47,13 +47,14 @@ describe('adapter factory', () => {
     expect(createRecoveryAdapter()).toBeUndefined();
     expect(getLiveRecovery()).toBe('none');
   });
-  it('falls back to recorded when live key is absent', () => {
+  it('fails closed without recorded substitution when the live key is absent', async () => {
     process.env.UNSAID_AI_MODE = 'live';
     process.env.GEMINI_API_KEY = '';
     vi.spyOn(console, 'warn').mockImplementation(() => undefined);
-    expect(createModelAdapter()).toBeInstanceOf(RecordedModelAdapter);
+    const adapter = createModelAdapter();
+    await expect(adapter.generateTurn({} as never)).rejects.toThrow('Live AI is not configured');
     expect(createRecoveryAdapter()).toBeUndefined();
-    expect(getRuntimeMode()).toBe('recorded');
+    expect(getRuntimeMode()).toBe('live');
   });
   it('fails safely to mock for unsupported mode', () => {
     process.env.UNSAID_AI_MODE = 'unsupported';

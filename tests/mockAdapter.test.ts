@@ -29,6 +29,14 @@ describe('mock adapter', () => {
     expect(ModelOutputSchema.parse(await adapter.generateTurn(makeRequest())).finalClosures).toBeUndefined();
     expect(ModelOutputSchema.parse(await adapter.generateTurn(makeRequest({ turnIndex: 9 }))).finalClosures).toBeDefined();
   });
+  it('comforts only the explicit guilt-plus-reassurance pattern needed for The Speech', async () => {
+    const result = ModelOutputSchema.parse(await new MockModelAdapter().generateTurn(makeRequest({
+      playerText: "I feel horrible. Please tell me I'm not a terrible person.",
+      selectedIntention: 'repair',
+    })));
+    expect(result.characterText).toMatch(/not a terrible person/i);
+    expect(result.perceivedImpact).toBe('pressure');
+  });
   it('supports a complete 10-turn run', async () => {
     const adapter = new MockModelAdapter();
     for (let turnIndex = 0; turnIndex < 10; turnIndex += 1) {

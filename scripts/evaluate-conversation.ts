@@ -34,6 +34,6 @@ for (const [name, turns] of Object.entries(paths)) {
   if (moves.some((move, index) => index >= 2 && ['set_boundary','withdraw'].includes(move) && ['set_boundary','withdraw'].includes(moves[index - 1]) && ['set_boundary','withdraw'].includes(moves[index - 2]))) throw new Error(`${name}: repeated withdrawal`);
   if (new Set(narrative.revealedMemoryIds).size !== narrative.revealedMemoryIds.length) throw new Error(`${name}: duplicate memory`);
   if (transcript.some((entry) => /exhibition.*nine years|nine years.*exhibition/i.test(entry.text))) throw new Error(`${name}: chronology merged`);
-  const outcome = evaluateOutcome({ assessments, finalEngagement: state.engagement, finalTension: state.tension });
+  const outcome = evaluateOutcome({ assessments, finalEngagement: state.engagement, finalTension: state.tension, narrativeState: narrative });
   console.log(`[UNSAID] ${mode} ${name}: ${outcome}, memories=${narrative.revealedMemoryIds.length}, belief=${narrative.activeBelief}`);
 }

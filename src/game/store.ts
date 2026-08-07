@@ -1,7 +1,6 @@
 import { create } from 'zustand';
 import type {
   AppMode,
-  FinalClosures,
   OutcomeDef,
   PlayerIntent,
   PortraitState,
@@ -13,7 +12,7 @@ import type {
 import { createNarrativeState, type NarrativeState } from './narrative';
 import { SCENARIO } from './scenario';
 import { applyTurn, derivePortraitState } from './state';
-import { classifyAlignment, evaluateOutcome } from './outcome';
+import { classifyAlignment, evaluateOutcome, selectOutcomeClosure } from './outcome';
 import { postTurn } from '../lib/turnClient';
 
 type Status = 'idle' | 'loading' | 'error';
@@ -122,6 +121,9 @@ async function executeTurn(
     const response = await postTurn(request);
     const current = get();
     if (!isCurrentRequest(current, runId, requestId)) return;
+    if (!response.narrative) {
+      throw new Error('The turn response was incomplete. Please retry.');
+    }
 
     const nextState = applyTurn(
       {
@@ -153,8 +155,8 @@ async function executeTurn(
       portraitState: nextState.portraitState,
       transcript,
       assessments,
-      narrativeState: response.narrative?.state ?? current.narrativeState,
-      narrativeHistory: response.narrative ? [...current.narrativeHistory, response.narrative.meta] : current.narrativeHistory,
+      narrativeState: response.narrative.state,
+      narrativeHistory: [...current.narrativeHistory, response.narrative.meta],
       turnIndex,
       input: '',
       selectedIntention: null,
@@ -170,13 +172,12 @@ async function executeTurn(
         assessments,
         finalEngagement: nextState.engagement,
         finalTension: nextState.tension,
+        narrativeState: response.narrative.state,
       });
-      const closures: FinalClosures =
-        response.finalClosures ?? SCENARIO.fallbackClosures;
       set({
         ...commonUpdate,
         outcome: SCENARIO.outcomes[outcomeId],
-        closingMessage: closures[outcomeId],
+        closingMessage: selectOutcomeClosure(outcomeId, response.finalClosures),
         mode: current.mode === 'paused' ? 'paused' : 'closing',
       });
       return;

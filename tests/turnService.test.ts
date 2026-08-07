@@ -15,9 +15,45 @@ function adapter(output: unknown, throws = false): ModelAdapter {
 
 describe('turn service', () => {
   it('returns validated primary output', async () => {
-    const result = await processTurn(makeRequest(), adapter(makeModelOutput()));
+    const result = await processTurn(makeRequest({ playerText: 'What happened?' }), adapter(makeModelOutput()));
     expect(result.characterText).toContain('door');
     expect(result.assessment.perceivedImpact).toBe('understanding');
+  });
+  it('protects genuine experience and clarification questions from unclear harmful scoring', async () => {
+    const result = await processTurn(
+      makeRequest({ playerText: "What chair? Wait, I don't understand." }),
+      adapter(makeModelOutput({ perceivedImpact: 'unclear', engagementDelta: -3, tensionDelta: 3 }))
+    );
+    expect(result.assessment).toMatchObject({
+      perceivedImpact: 'understanding',
+      engagementDelta: -1,
+      tensionDelta: 1,
+    });
+    expect(result.narrative?.meta.genuineQuestion).toBe('clarification');
+  });
+  it('does not protect hostile rhetorical questions', async () => {
+    const result = await processTurn(
+      makeRequest({ playerText: 'Why are you overreacting?' }),
+      adapter(makeModelOutput({ perceivedImpact: 'minimization', engagementDelta: -3, tensionDelta: 3 }))
+    );
+    expect(result.assessment).toMatchObject({
+      perceivedImpact: 'minimization',
+      engagementDelta: -3,
+      tensionDelta: 3,
+    });
+  });
+  it('returns complete narrative metadata for every accepted turn', async () => {
+    const result = await processTurn(makeRequest({ playerText: 'What happened?' }), adapter(makeModelOutput()));
+    expect(result.narrative?.meta).toEqual(expect.objectContaining({
+      turnIndex: 0,
+      primarySceneMove: 'answer',
+      targetLength: 'medium',
+      offeredMemoryId: null,
+      revealedMemoryId: null,
+      activeBeliefBefore: 'i_did_not_matter',
+      activeBeliefAfter: 'i_did_not_matter',
+      genuineQuestion: 'experience',
+    }));
   });
   it('uses recovery for invalid primary output', async () => {
     const primary = adapter({ invalid: true });

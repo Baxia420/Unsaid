@@ -10,7 +10,10 @@ const IMMUTABLE_FACTS = [
   'The first public photography exhibition happened three weeks ago; it was not discussed for nine years.',
   'The player helped choose photographs before the exhibition and repeatedly promised to attend.',
   'The player forgot, stayed away from shame, lied that "Something came up," and then there were three weeks of silence.',
-  'There were six invited guests. Do not invent dates, durations, guests, promises, or shared events.',
+  'There were exactly six invited guests total, and the absent player was one of the six. At most five other invited guests could attend.',
+  'The player did not help choose an exhibition chair. Do not invent chair-selection history or connect a chair to choosing photographs.',
+  'It is not established that she packed up alone.',
+  'Do not invent dates, durations, guests, furniture history, promises, or shared events.',
 ].map((fact) => `- ${fact}`).join('\n');
 
 function formatTranscript(request: TurnRequest): string {
@@ -20,10 +23,12 @@ function formatTranscript(request: TurnRequest): string {
 export function buildLivePrompt(request: TurnRequest): LivePrompt {
   const directive = createTurnDirective(request);
   const state = request.narrativeState;
-  const memory = directive.offeredMemory ? `Use this one memory accurately as new information: ${directive.offeredMemory.text}` : 'Do not introduce a new private memory this turn.';
+  const memory = directive.offeredMemory
+    ? `CANONICAL FACT (the only new memory allowed): Use this one memory accurately: ${directive.offeredMemory.canonicalStatement}\n- EMOTIONAL INTERPRETATION: You may phrase how that fact felt naturally, but may not add another event, duration, guest, object, or chronology.`
+    : 'CANONICAL FACT: No new private memory is offered. Do not introduce one this turn.';
   const length = { very_short: 'a phrase or one brief sentence', short: 'one or two sentences', medium: 'two or three sentences', long: 'up to four or five sentences, only because this is an important memory or complex answer' }[directive.targetLength];
   const finalInstruction = request.turnIndex === SCENARIO.totalTurns - 1
-    ? 'This is the tenth and final player turn. Return finalClosures with even, smoothed, and the_speech. Ground each in the transcript; do not choose or name an outcome. the_speech must support a dynamic where she has been pulled into reassuring the player.'
+    ? 'This is the tenth and final player turn. Return finalClosures with even, smoothed, and the_speech. Ground each in the transcript; do not choose or name an outcome. even is a partial honest opening without full forgiveness. smoothed is unresolved, distant, cold, or surface closure and must not falsely say things are fine. the_speech must be spoken by the friend actually reassuring or comforting the player.'
     : 'Do not return finalClosures.';
 
   return {
@@ -39,11 +44,12 @@ ${CHARACTER_PROFILE.map((trait) => `- ${trait}`).join('\n')}
 TURN DIRECTIVE (code-owned; follow it, do not re-plan)
 - Primary move: ${directive.primaryMove}
 - Address first: ${directive.mustAddress}
+- Genuine-question classification: ${directive.genuineQuestion}
 - Tone: ${directive.tone}
 - Length: ${length}; never pad to a minimum.
 - ${memory}
 - Avoid reopening these revealed memory IDs/topics: ${directive.avoidTopics.join(', ') || 'none'}
-- Answer a direct question before adding anything else. You may qualify, refuse, or challenge its premise after answering.
+- For experience, clarification, relationship_status, repair, or comparison questions, answer first. You may qualify or refuse, but ordinary clarification is not avoidance. Hostile rhetorical questions do not receive this protection.
 
 VOICE AND CONTINUITY
 - Respond to the player's exact wording and established transcript. Do not merge unrelated facts, invent accusations, demand an admission already made, or repeat a resolved grievance.

@@ -4,6 +4,8 @@ import { SCENARIO } from '../../src/game/scenario';
 import type { ModelAdapter } from '../adapters/ModelAdapter';
 import { ModelOutputSchema, type ValidatedModelOutput } from './schema';
 import { advanceNarrativeState, createTurnDirective, type TurnDirective } from './directive';
+import { findFactualIssues } from './factualValidation';
+import { createNarrativeState } from '../../src/game/narrative';
 
 export interface CategorizedError {
   category: string;
@@ -11,6 +13,16 @@ export interface CategorizedError {
   status?: number;
   retryAfter?: number;
   causeCode?: string;
+}
+
+export class RecoverableTurnError extends Error {
+  readonly code = 'FACTUAL_CONSISTENCY_REJECTED';
+  readonly retryable = true;
+
+  constructor() {
+    super('That response conflicted with the established story. Please retry.');
+    this.name = 'RecoverableTurnError';
+  }
 }
 
 function hasStatus(error: unknown): error is { status: number } {
@@ -80,7 +92,12 @@ async function generateWithDiagnostics(
     const raw = await adapter.generateTurn(request);
     const parsed = ModelOutputSchema.safeParse(raw);
     const latencyMs = Date.now() - start;
-    if (parsed.success) return { output: parsed.data, latencyMs };
+    if (parsed.success) {
+      if (findFactualIssues(parsed.data).length > 0) {
+        return { output: null, error: { category: 'FACTUAL_CONSISTENCY', retryable: true }, latencyMs };
+      }
+      return { output: parsed.data, latencyMs };
+    }
     return { output: null, error: { category: 'SCHEMA_INVALID', retryable: false }, latencyMs };
   } catch (error) {
     const latencyMs = Date.now() - start;
@@ -118,6 +135,10 @@ export async function processTurnDetailed(
     };
   }
 
+  if (primary.error?.category === 'FACTUAL_CONSISTENCY') {
+    throw new RecoverableTurnError();
+  }
+
   if (recoveryAdapter && recoveryAdapter !== primaryAdapter) {
     const recovery = await generateWithDiagnostics(request, recoveryAdapter, 'recorded-recovery');
     if (recovery.output) {
@@ -130,6 +151,9 @@ export async function processTurnDetailed(
         retryAfter: primary.error?.retryAfter,
         causeCode: primary.error?.causeCode,
       };
+    }
+    if (recovery.error?.category === 'FACTUAL_CONSISTENCY') {
+      throw new RecoverableTurnError();
     }
   }
 
@@ -166,28 +190,48 @@ function makeResponse(
       request.state.tension
     ),
   };
-  const nextState = applyTurn(
-    currentState,
-    output.engagementDelta,
-    output.tensionDelta
-  );
   const isFinalTurn = request.turnIndex === SCENARIO.totalTurns - 1;
+  const genuineQuestion = directive.genuineQuestion;
+  const protectsQuestion = !['none', 'hostile_rhetorical'].includes(genuineQuestion);
+  const shouldLandAsUnderstanding = ['experience', 'clarification'].includes(genuineQuestion);
+  const perceivedImpact = shouldLandAsUnderstanding &&
+    !['understanding', 'acknowledgment', 'explanation', 'repair'].includes(output.perceivedImpact)
+      ? 'understanding'
+      : output.perceivedImpact;
+  const engagementDelta = protectsQuestion ? Math.max(-1, output.engagementDelta) : output.engagementDelta;
+  const tensionDelta = protectsQuestion ? Math.min(1, output.tensionDelta) : output.tensionDelta;
+  const nextState = applyTurn(currentState, engagementDelta, tensionDelta);
+  const nextNarrativeState = advanceNarrativeState(request, directive, output.characterText);
+  const actualMove = nextNarrativeState.recentSceneMoves.at(-1) ?? directive.primaryMove;
+  const offeredMemoryId = directive.offeredMemory?.id ?? null;
+  const revealedMemoryId = offeredMemoryId && nextNarrativeState.revealedMemoryIds.includes(offeredMemoryId)
+    ? offeredMemoryId
+    : null;
 
   return {
     characterText: output.characterText,
     assessment: {
-      perceivedImpact: output.perceivedImpact,
-      impactReason: output.impactReason,
-      engagementDelta: output.engagementDelta,
-      tensionDelta: output.tensionDelta,
+      perceivedImpact,
+      impactReason: perceivedImpact === output.perceivedImpact
+        ? output.impactReason
+        : genuineQuestion === 'clarification'
+          ? 'You asked for clarification instead of pretending to understand.'
+          : 'You asked directly about what happened and made room for an answer.',
+      engagementDelta,
+      tensionDelta,
     },
     presentation: { portraitState: nextState.portraitState },
     narrative: {
-      state: advanceNarrativeState(request, directive),
+      state: nextNarrativeState,
       meta: {
-        sceneMove: directive.primaryMove,
-        memoryId: directive.offeredMemory?.id ?? null,
-        activeBelief: advanceNarrativeState(request, directive).activeBelief,
+        turnIndex: request.turnIndex,
+        primarySceneMove: actualMove,
+        targetLength: directive.targetLength,
+        offeredMemoryId,
+        revealedMemoryId,
+        activeBeliefBefore: (request.narrativeState ?? createNarrativeState()).activeBelief,
+        activeBeliefAfter: nextNarrativeState.activeBelief,
+        genuineQuestion,
       },
     },
     ...(isFinalTurn
@@ -198,6 +242,12 @@ function makeResponse(
 
 export function makeFallback(request: TurnRequest): TurnResponse {
   const isFinalTurn = request.turnIndex === SCENARIO.totalTurns - 1;
+  const directive = createTurnDirective(request);
+  const nextNarrativeState = advanceNarrativeState(request, directive, SCENARIO.fallbackCharacterLine);
+  const offeredMemoryId = directive.offeredMemory?.id ?? null;
+  const revealedMemoryId = offeredMemoryId && nextNarrativeState.revealedMemoryIds.includes(offeredMemoryId)
+    ? offeredMemoryId
+    : null;
   return {
     characterText: SCENARIO.fallbackCharacterLine,
     assessment: {
@@ -211,6 +261,19 @@ export function makeFallback(request: TurnRequest): TurnResponse {
         request.state.engagement,
         request.state.tension
       ),
+    },
+    narrative: {
+      state: nextNarrativeState,
+      meta: {
+        turnIndex: request.turnIndex,
+        primarySceneMove: nextNarrativeState.recentSceneMoves.at(-1) ?? directive.primaryMove,
+        targetLength: directive.targetLength,
+        offeredMemoryId,
+        revealedMemoryId,
+        activeBeliefBefore: (request.narrativeState ?? createNarrativeState()).activeBelief,
+        activeBeliefAfter: nextNarrativeState.activeBelief,
+        genuineQuestion: directive.genuineQuestion,
+      },
     },
     ...(isFinalTurn ? { finalClosures: SCENARIO.fallbackClosures } : {}),
   };

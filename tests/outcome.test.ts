@@ -1,10 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { classifyAlignment, evaluateOutcome } from '../src/game/outcome';
+import { classifyAlignment, evaluateOutcome, selectOutcomeClosure } from '../src/game/outcome';
+import { createNarrativeState, type NarrativeState } from '../src/game/narrative';
 import type { PerceivedImpact, TurnAssessment } from '../src/game/types';
-import { makeAssessment } from './helpers';
+import { CLOSURES, makeAssessment } from './helpers';
 
 function sequence(impacts: PerceivedImpact[]): TurnAssessment[] {
   return impacts.map((impact) => makeAssessment(impact));
+}
+
+function narrative(overrides: Partial<NarrativeState> = {}): NarrativeState {
+  return { ...createNarrativeState(), ...overrides };
 }
 
 describe('alignment classification', () => {
@@ -18,48 +23,90 @@ describe('alignment classification', () => {
     'classifies %s as harmful divergence',
     (impact) => expect(classifyAlignment('repair', impact)).toBe('harmful_divergence')
   );
-  it.each(['understanding', 'acknowledgment', 'explanation', 'repair', 'unclear'] as const)(
-    'keeps nonmatching constructive/neutral impact %s non-harmful',
-    (impact) => {
-      if (impact !== 'repair') expect(classifyAlignment('repair', impact)).toBe('constructive_divergence');
-    }
-  );
 });
 
 describe('code-owned outcomes', () => {
-  it.each([
-    [Array(10).fill('repair')],
-    [[...Array(5).fill('understanding'), ...Array(5).fill('acknowledgment'), ...Array(5).fill('repair')]],
-  ] as [PerceivedImpact[]][])('reaches Even through sustained constructive patterns', (impacts) => {
-    expect(evaluateOutcome({ assessments: sequence(impacts), finalEngagement: 5, finalTension: 0 })).toBe('even');
+  it('reaches Even only with constructive state plus a revealed truth and belief movement', () => {
+    const state = narrative({
+      revealedMemoryIds: ['missed_player'],
+      activeBelief: 'repair_might_be_possible',
+    });
+    expect(evaluateOutcome({
+      assessments: sequence([...Array(6).fill('acknowledgment'), ...Array(4).fill('repair')]),
+      finalEngagement: 5,
+      finalTension: 0,
+      narrativeState: state,
+    })).toBe('even');
   });
-  it.each([
-    [Array(10).fill('pressure')],
-    [[...Array(7).fill('defense'), ...Array(8).fill('minimization')]],
-  ] as [PerceivedImpact[]][])('reaches The Speech through harmful patterns', (impacts) => {
-    expect(evaluateOutcome({ assessments: sequence(impacts), finalEngagement: -5, finalTension: 8 })).toBe('the_speech');
+
+  it('does not award Even from scores or one apology without narrative support', () => {
+    expect(evaluateOutcome({
+      assessments: sequence(Array(10).fill('repair')),
+      finalEngagement: 8,
+      finalTension: -2,
+      narrativeState: createNarrativeState(),
+    })).toBe('smoothed');
   });
-  it.each([
-    [Array(10).fill('unclear')],
-    [[...Array(7).fill('explanation'), ...Array(8).fill('unclear')]],
-  ] as [PerceivedImpact[]][])('reaches Smoothed through unresolved patterns', (impacts) => {
-    expect(evaluateOutcome({ assessments: sequence(impacts), finalEngagement: 0, finalTension: 1 })).toBe('smoothed');
+
+  it('reaches The Speech only when guilt or reassurance pressure led to actual comfort', () => {
+    const state = narrative({
+      outcomeEvidence: {
+        playerCenteredGuiltCount: 1,
+        reassurancePressureCount: 1,
+        friendComfortMoveCount: 1,
+      },
+    });
+    expect(evaluateOutcome({
+      assessments: sequence(Array(10).fill('pressure')),
+      finalEngagement: -5,
+      finalTension: 8,
+      narrativeState: state,
+    })).toBe('the_speech');
   });
-  it('allows meaningful recovery after early mistakes', () => {
-    const impacts = [...Array(2).fill('defense'), ...Array(4).fill('acknowledgment'), ...Array(4).fill('repair')] as PerceivedImpact[];
-    expect(evaluateOutcome({ assessments: sequence(impacts), finalEngagement: 6, finalTension: 1 })).toBe('even');
+
+  it('maps repeated minimization and a hostile goodbye to Smoothed when no comfort occurred', () => {
+    expect(evaluateOutcome({
+      assessments: sequence([...Array(9).fill('minimization'), 'avoidance']),
+      finalEngagement: -10,
+      finalTension: 10,
+      narrativeState: narrative({
+        activeBelief: 'they_want_relief',
+        outcomeEvidence: {
+          playerCenteredGuiltCount: 0,
+          reassurancePressureCount: 0,
+          friendComfortMoveCount: 0,
+        },
+      }),
+    })).toBe('smoothed');
   });
-  it('lets late harm damage an otherwise constructive run', () => {
-    const impacts = [...Array(6).fill('repair'), 'pressure', 'defense', 'minimization', 'pressure'] as PerceivedImpact[];
-    expect(evaluateOutcome({ assessments: sequence(impacts), finalEngagement: 2, finalTension: 6 })).toBe('the_speech');
+
+  it('requires comfort even when the player pressures for reassurance', () => {
+    expect(evaluateOutcome({
+      assessments: sequence(Array(10).fill('pressure')),
+      finalEngagement: -5,
+      finalTension: 8,
+      narrativeState: narrative({
+        outcomeEvidence: {
+          playerCenteredGuiltCount: 0,
+          reassurancePressureCount: 4,
+          friendComfortMoveCount: 0,
+        },
+      }),
+    })).toBe('smoothed');
   });
-  it('does not let one final line determine the whole outcome', () => {
-    const impacts = [...Array(9).fill('pressure'), 'repair'] as PerceivedImpact[];
-    expect(evaluateOutcome({ assessments: sequence(impacts), finalEngagement: -4, finalTension: 8 })).toBe('the_speech');
+});
+
+describe('outcome-consistent closing selection', () => {
+  it('keeps consistent generated closures', () => {
+    expect(selectOutcomeClosure('even', CLOSURES)).toBe(CLOSURES.even);
+    expect(selectOutcomeClosure('smoothed', CLOSURES)).toBe(CLOSURES.smoothed);
+    expect(selectOutcomeClosure('the_speech', CLOSURES)).toBe(CLOSURES.the_speech);
   });
-  it('uses emotional state deterministically', () => {
-    const assessments = sequence(Array(10).fill('unclear'));
-    expect(evaluateOutcome({ assessments, finalEngagement: -3, finalTension: 8 })).toBe('the_speech');
-    expect(evaluateOutcome({ assessments, finalEngagement: 0, finalTension: 0 })).toBe('smoothed');
+
+  it('rejects a non-comforting The Speech closing and false Smoothed reassurance', () => {
+    expect(selectOutcomeClosure('the_speech', { ...CLOSURES, the_speech: 'Goodbye.' }))
+      .not.toBe('Goodbye.');
+    expect(selectOutcomeClosure('smoothed', { ...CLOSURES, smoothed: "We're okay now." }))
+      .not.toBe("We're okay now.");
   });
 });

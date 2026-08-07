@@ -87,7 +87,7 @@ export const SCENARIO = {
     even:
       "I don't know if we're okay yet. But this is the first time in weeks that this has felt honest.",
     smoothed: "I think it's best if we finish our drinks and leave it here for today.",
-    the_speech: "You do not have to make this easier for me. I can sit with what I did; you do not need to comfort me before you leave.",
+    the_speech: "You're not a terrible person. I know you panicked. I just wish this conversation had left more room for what it did to me.",
   } as FinalClosures,
   outcomes: {
     even: {
@@ -98,7 +98,7 @@ export const SCENARIO = {
     smoothed: {
       id: 'smoothed',
       title: 'Smoothed',
-      description: 'They say it is fine. The untouched drink says otherwise.',
+      description: 'The conversation ends without repair: courteous, cold, or simply unfinished.',
     },
     the_speech: {
       id: 'the_speech',

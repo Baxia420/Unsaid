@@ -2,6 +2,7 @@ import type { ModelAdapter } from './ModelAdapter';
 import type { ModelOutput, TurnRequest } from '../../src/game/types';
 import { SCENARIO } from '../../src/game/scenario';
 import { createTurnDirective } from '../turn/directive';
+import { isPlayerCenteredGuilt, isReassurancePressure } from '../../src/game/narrative';
 
 export type MockMode = 'valid' | 'malformed' | 'error';
 
@@ -21,19 +22,29 @@ function generateDeterministicOutput(request: TurnRequest): ModelOutput {
   if (directive.primaryMove === 'answer') {
     const pressured = /forgive|move on|fine now|say we are okay|say we're okay/.test(text);
     return withFinalClosures(request, {
-      characterText: pressured ? "No. I'm not ready to say we're okay just to make this easier." : directive.offeredMemory ? `Yes. ${directive.offeredMemory.text} That is part of why this is difficult to answer simply.` : "Yes, something like that has happened before. It doesn't make this hurt less, but I understand why you're asking.",
+      characterText: pressured ? "No. I'm not ready to say we're okay just to make this easier." : directive.offeredMemory ? `Yes. ${directive.offeredMemory.canonicalStatement} That is part of why this is difficult to answer simply.` : "Yes, something like that has happened before. It doesn't make this hurt less, but I understand why you're asking.",
       perceivedImpact: pressured ? 'pressure' : request.selectedIntention === 'understand' ? 'understanding' : 'unclear',
       impactReason: pressured ? 'You asked for reassurance before they were ready to give it.' : 'You asked a direct question that made room for an honest answer.', engagementDelta: pressured ? -2 : 1, tensionDelta: pressured ? 2 : 0,
     });
   }
   if (directive.primaryMove === 'recall_relationship' && directive.offeredMemory) {
-    return withFinalClosures(request, { characterText: `${directive.offeredMemory.text} I haven't forgotten that version of us, even now.`, perceivedImpact: 'acknowledgment', impactReason: 'You made enough room for a warmer memory to coexist with the hurt.', engagementDelta: 2, tensionDelta: -1 });
+    return withFinalClosures(request, { characterText: `${directive.offeredMemory.canonicalStatement} I haven't forgotten that version of us, even now.`, perceivedImpact: 'acknowledgment', impactReason: 'You made enough room for a warmer memory to coexist with the hurt.', engagementDelta: 2, tensionDelta: -1 });
   }
   if (directive.primaryMove === 'reveal_memory' && directive.offeredMemory) {
-    return withFinalClosures(request, { characterText: `${directive.offeredMemory.text} I didn't know what to do with that afterward.`, perceivedImpact: 'understanding', impactReason: 'You left space for a specific part of the hurt to be named.', engagementDelta: 1, tensionDelta: 0 });
+    return withFinalClosures(request, { characterText: `${directive.offeredMemory.canonicalStatement} I didn't know what to do with that afterward.`, perceivedImpact: 'understanding', impactReason: 'You left space for a specific part of the hurt to be named.', engagementDelta: 1, tensionDelta: 0 });
   }
   if (directive.primaryMove === 'soften') {
     return withFinalClosures(request, { characterText: "I hear you. I'm not ready to call us okay, but that was honest.", perceivedImpact: 'acknowledgment', impactReason: 'Your honesty softened the conversation without asking for forgiveness.', engagementDelta: 2, tensionDelta: -1 });
+  }
+
+  if (isPlayerCenteredGuilt(request.playerText) && isReassurancePressure(request.playerText)) {
+    return withFinalClosures(request, {
+      characterText: "You're not a terrible person. I know you panicked. I just need this conversation to leave room for what happened to me, too.",
+      perceivedImpact: 'pressure',
+      impactReason: 'Your need for reassurance made them set aside their hurt to steady you.',
+      engagementDelta: -1,
+      tensionDelta: 1,
+    });
   }
 
   if (/forgive|move on|fine now|say we're okay/.test(text)) {

@@ -72,9 +72,14 @@ export interface TurnRequest {
 }
 
 export interface TurnNarrativeMeta {
-  sceneMove: import('./narrative').SceneMove;
-  memoryId: string | null;
-  activeBelief: import('./narrative').ActiveBelief;
+  turnIndex: number;
+  primarySceneMove: import('./narrative').SceneMove;
+  targetLength: 'very_short' | 'short' | 'medium' | 'long';
+  offeredMemoryId: string | null;
+  revealedMemoryId: string | null;
+  activeBeliefBefore: import('./narrative').ActiveBelief;
+  activeBeliefAfter: import('./narrative').ActiveBelief;
+  genuineQuestion: import('./narrative').GenuineQuestionClassification;
   providerSource?: string;
   latencyMs?: number;
 }
