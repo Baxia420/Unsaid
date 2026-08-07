@@ -445,14 +445,6 @@ export default function ConversationScene() {
             ))}
           </div>
           <div className="cs-prologue-actions">
-            {prologuePart > 0 && (
-              <button className="cs-title-btn-ghost" onClick={() => prevProloguePart()}>
-                Back
-              </button>
-            )}
-            <button className="cs-title-btn-ghost" onClick={handleSkipPrologue}>
-              Skip Prologue
-            </button>
             {isLastPart ? (
               <button
                 className="cs-title-btn-primary"
@@ -470,6 +462,14 @@ export default function ConversationScene() {
                 aria-label="Continue — Next part"
               >
                 Continue
+              </button>
+            )}
+            <button className="cs-title-btn-ghost" onClick={handleSkipPrologue}>
+              Skip Prologue
+            </button>
+            {prologuePart > 0 && (
+              <button className="cs-title-btn-ghost" onClick={() => prevProloguePart()}>
+                Back
               </button>
             )}
           </div>
@@ -1164,8 +1164,11 @@ function CreditsModal({ onClose }: { onClose: () => void }) {
           <strong>UNSAID</strong> is a narrative empathy game about the things
           we leave unsaid and the cost of leaving them.
         </p>
+        <p>Created for the Tencent Cloud × UTM Hackathon 2026.</p>
         <p>Built with React, TypeScript, and Google Gemini.</p>
-        <p>All artwork and scenario content original.</p>
+        <p>Developed with Tencent Cloud CodeBuddy as the core AI coding assistant.</p>
+        <p>All visual artwork for UNSAID was generated with Nano Banana Pro.</p>
+        <p>Live character dialogue is powered by Google Gemini.</p>
         <button
           ref={closeRef as RefObject<HTMLButtonElement>}
           className="cs-modal-close"
