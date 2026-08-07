@@ -15,6 +15,22 @@ describe('Vercel production entry points', () => {
     expect(turn.body).toHaveProperty('narrative');
   });
 
+  it('handles stripped Vercel function paths (/) gracefully', async () => {
+    const statusRoot = await request(statusApp).get('/');
+    expect(statusRoot.status).toBe(200);
+    expect(statusRoot.body).toHaveProperty('aiMode');
+
+    const turnRoot = await request(turnApp).post('/').send(makeRequest());
+    expect(turnRoot.status).toBe(200);
+    expect(turnRoot.body).toHaveProperty('narrative');
+  });
+
+  it('returns 404 JSON for unmapped routes instead of hanging', async () => {
+    const res = await request(statusApp).get('/api/unknown-endpoint');
+    expect(res.status).toBe(404);
+    expect(res.body).toEqual({ error: 'Not found' });
+  });
+
   it('builds Vite and rewrites only non-API browser routes to the SPA', () => {
     const config = JSON.parse(readFileSync(resolve(__dirname, '../vercel.json'), 'utf8'));
     expect(config).toMatchObject({

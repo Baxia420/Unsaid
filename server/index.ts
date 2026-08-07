@@ -38,13 +38,20 @@ export function createApp(): express.Express {
   const model = process.env.GEMINI_MODEL ?? 'gemini-3.5-flash-lite';
   console.log(`[UNSAID] AI runtime: mode=${mode} model=${model} keyConfigured=${keyConfigured} recovery=${recovery}`);
 
-  app.get('/api/status', (_req, res) => {
+  app.get(['/api/status', '/status', '/'], (_req, res) => {
     res.json({
       aiMode: mode,
       recoveryMode: recovery,
     });
   });
-  app.use('/api/turn', createTurnRouter(adapter, recoveryAdapter, { strictLive: mode === 'live' && recovery === 'none' }));
+  app.use(['/api/turn', '/turn'], createTurnRouter(adapter, recoveryAdapter, { strictLive: mode === 'live' && recovery === 'none' }));
+  app.use('/', createTurnRouter(adapter, recoveryAdapter, { strictLive: mode === 'live' && recovery === 'none' }));
+
+  app.use((_req, res) => {
+    res.status(404).json({
+      error: 'Not found',
+    });
+  });
 
   app.use(errorHandler);
 
