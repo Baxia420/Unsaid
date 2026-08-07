@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { SCENARIO } from '../../src/game/scenario.js';
+import { SCENARIO } from '../../src/game/scenario';
 
 export const PlayerIntentSchema = z.enum([
   'understand',
