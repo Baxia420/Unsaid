@@ -42,13 +42,15 @@ def prepare_portraits() -> list[Path]:
             raise FileNotFoundError(f"Missing portrait source: {source}")
 
         with Image.open(source) as image:
-            reduced = image.reduce(4).convert("RGBA")
-            portrait = reduced.resize((800, 1200), Image.Resampling.LANCZOS)
+            portrait = image.convert("RGBA").resize(
+                (800, 1200),
+                Image.Resampling.LANCZOS,
+            )
             alpha = portrait.getchannel("A")
             if alpha.getextrema()[0] != 0:
                 raise ValueError(f"Portrait has no transparent pixels: {source.name}")
             destination = FRIEND_DIR / output_name
-            save_webp(portrait, destination, quality=86)
+            save_webp(portrait, destination, quality=92)
             outputs.append(destination)
     return outputs
 
